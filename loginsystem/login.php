@@ -50,6 +50,64 @@ if (!empty($_SESSION['login_failed'])) {
         float:right; background:none; border:none;
         font-size:16px; cursor:pointer; color:#aaa; line-height:1;
     }
+
+    /* ── Username suggestion chips ── */
+    #username-suggestions {
+        display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; min-height:0;
+    }
+    .uname-chip {
+        background:rgba(102,126,234,0.12); border:1px solid rgba(102,126,234,0.4);
+        border-radius:20px; padding:3px 11px; font-size:11px; color:#667eea;
+        cursor:pointer; transition:background .2s; white-space:nowrap;
+        user-select:none;
+    }
+    .uname-chip:hover { background:rgba(102,126,234,0.25); }
+
+    /* ── Password generator button ── */
+    #pw-gen-btn {
+        display:inline-block; font-size:11px; color:#667eea;
+        cursor:pointer; background:none; border:none; padding:0;
+        text-decoration:underline; margin-top:4px;
+    }
+    #pw-gen-btn:disabled { color:#aaa; cursor:not-allowed; text-decoration:none; }
+
+    /* ── FAQ mini-bot ── */
+    #faq-toggle {
+        position:fixed; bottom:28px; left:28px;
+        width:44px; height:44px; border-radius:50%;
+        background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25);
+        cursor:pointer; box-shadow:0 3px 14px rgba(0,0,0,0.25);
+        font-size:18px; color:#fff; z-index:1000;
+        display:flex; align-items:center; justify-content:center;
+        transition:transform .2s;
+    }
+    #faq-toggle:hover { transform:scale(1.1); }
+    #faq-window {
+        display:none; position:fixed; bottom:84px; left:28px;
+        width:290px; background:#1e1e2e; border-radius:14px;
+        box-shadow:0 8px 28px rgba(0,0,0,0.5); z-index:1000;
+        border:1px solid rgba(255,255,255,0.08); overflow:hidden;
+    }
+    #faq-window.open { display:block; }
+    #faq-header {
+        padding:11px 14px;
+        background:linear-gradient(135deg,#667eea,#764ba2);
+        color:#fff; font-weight:600; font-size:13px;
+        display:flex; align-items:center; justify-content:space-between;
+    }
+    #faq-header button { background:none; border:none; color:#fff; cursor:pointer; font-size:16px; line-height:1; }
+    #faq-body { padding:13px; }
+    #faq-answer {
+        font-size:12px; color:#d0d0d0; line-height:1.6;
+        min-height:36px; margin-bottom:10px;
+    }
+    #faq-answer.thinking { color:#666; font-style:italic; }
+    #faq-input {
+        width:100%; border:1px solid rgba(255,255,255,0.15); border-radius:8px;
+        padding:7px 10px; background:rgba(255,255,255,0.05);
+        color:#fff; font-size:12px; outline:none; box-sizing:border-box;
+    }
+    #faq-input::placeholder { color:#555; }
 </style>
 </head>
 <body>
@@ -91,18 +149,33 @@ if (!empty($_SESSION['login_failed'])) {
 <label>Username </label>
 <input type="text" name="email" id="reg-email" class="form-control" required>
 <div id="email-status"></div>
+<div id="username-suggestions"></div>
 </div>
 <div class="form-group">
 <label>Password</label>
 <input type="password" name="password" id="reg-password" class="form-control" required>
 <div id="pw-strength-bar"></div>
 <div id="pw-strength-text"></div>
+<button type="button" id="pw-gen-btn">&#x2728; Suggest a password</button>
 </div>
 <button type="submit" class="btn btn-success"> SignUp </button>
 </form>
 </div>
 </div>
 </div>
+</div>
+
+<!-- ── FAQ Mini-bot ── -->
+<button id="faq-toggle" title="Quick Help">&#x2753;</button>
+<div id="faq-window">
+    <div id="faq-header">
+        <span>Quick Help</span>
+        <button id="faq-close">&times;</button>
+    </div>
+    <div id="faq-body">
+        <div id="faq-answer">Ask me anything about logging in or registering!</div>
+        <input id="faq-input" type="text" placeholder="Type your question…" maxlength="200" autocomplete="off">
+    </div>
 </div>
 
 <script>
@@ -176,7 +249,99 @@ if (!empty($_SESSION['login_failed'])) {
     }
 })();
 
-/* ── 3. AI Login Failure Tips ── */
+/* ── 3. AI Username Suggester ── */
+(function () {
+    const field   = document.getElementById('reg-email');
+    const suggest = document.getElementById('username-suggestions');
+    let timer = null;
+
+    field.addEventListener('input', function () {
+        clearTimeout(timer);
+        suggest.innerHTML = '';
+        const val = this.value;
+        // Extract local part (before @) or use full value if no @
+        const base = val.includes('@') ? val.split('@')[0] : val;
+        if (base.length < 3) return;
+        timer = setTimeout(() => fetchSuggestions(base, val), 1200);
+    });
+
+    async function fetchSuggestions(base, fullVal) {
+        try {
+            const res  = await fetch('ai_username.php', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username: base}) });
+            const data = await res.json();
+            if (!data.suggestions || !data.suggestions.length) return;
+            const domain = fullVal.includes('@') ? '@' + fullVal.split('@')[1] : '';
+            suggest.innerHTML = data.suggestions.map(s =>
+                `<span class="uname-chip" data-val="${s}${domain}">${s}${domain}</span>`
+            ).join('');
+            suggest.querySelectorAll('.uname-chip').forEach(chip => {
+                chip.addEventListener('click', () => { field.value = chip.dataset.val; suggest.innerHTML = ''; field.dispatchEvent(new Event('input')); });
+            });
+        } catch (e) { /* silent fail */ }
+    }
+})();
+
+/* ── 4. AI Password Generator ── */
+(function () {
+    const btn   = document.getElementById('pw-gen-btn');
+    const field = document.getElementById('reg-password');
+    const text  = document.getElementById('pw-strength-text');
+
+    btn.addEventListener('click', async function () {
+        btn.disabled = true;
+        btn.textContent = 'Generating…';
+        try {
+            const res  = await fetch('ai_passgen.php');
+            const data = await res.json();
+            if (data.password) {
+                field.type  = 'text';
+                field.value = data.password;
+                text.textContent  = 'Generated — copy it somewhere safe, then it will hide.';
+                text.style.color  = '#667eea';
+                setTimeout(() => { field.type = 'password'; }, 5000);
+                // Trigger strength check
+                field.dispatchEvent(new Event('input'));
+            }
+        } catch (e) {
+            text.textContent = 'Could not generate. Try again.';
+        } finally {
+            btn.disabled    = false;
+            btn.textContent = '✨ Suggest a password';
+        }
+    });
+})();
+
+/* ── 5. FAQ Mini-bot ── */
+(function () {
+    const toggle  = document.getElementById('faq-toggle');
+    const win     = document.getElementById('faq-window');
+    const close   = document.getElementById('faq-close');
+    const answerEl = document.getElementById('faq-answer');
+    const input   = document.getElementById('faq-input');
+
+    toggle.addEventListener('click', () => { win.classList.toggle('open'); if (win.classList.contains('open')) input.focus(); });
+    close.addEventListener('click',  () => win.classList.remove('open'));
+
+    input.addEventListener('keydown', async function (e) {
+        if (e.key !== 'Enter') return;
+        const q = input.value.trim();
+        if (!q) return;
+        input.value = '';
+        answerEl.className = 'thinking';
+        answerEl.textContent = 'Thinking…';
+        try {
+            const res  = await fetch('ai_faq.php', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({question: q}) });
+            const data = await res.json();
+            answerEl.className = '';
+            answerEl.textContent = data.answer || 'Sorry, no answer available.';
+        } catch (e) {
+            answerEl.className = '';
+            answerEl.textContent = 'Network error. Please try again.';
+        }
+    });
+})();
+
+/* ── 6. AI Login Failure Tips ── */
 <?php if ($loginFailed): ?>
 (async function () {
     const list  = document.getElementById('ai-tips-list');
