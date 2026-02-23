@@ -1,12 +1,13 @@
 <?php
-
 session_start();
 
-
+if (!isset($_SESSION['email'])) {
+    header('location:login.php');
+    exit();
+}
 ?>
 <html>
 <head>
-
 <title></title>
 <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 <link rel="stylesheet" type="text/css" href="style/cleanup.css">
@@ -25,6 +26,6 @@ h1{
 </head>
 <body>
 <a href="logout.php">LOGOUT</a>
-<h1> Welcome <?php echo $_SESSION ['email'];?></h1>
+<h1> Welcome <?php echo htmlspecialchars($_SESSION['email']); ?></h1>
 </body>
 </html>
