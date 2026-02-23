@@ -86,11 +86,35 @@ if (!isset($_SESSION['email'])) {
     }
     #chat-send:hover { opacity:0.85; }
     #chat-send:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* ── Security tip card ── */
+    #tip-card {
+        max-width:480px; margin:24px auto 0;
+        background:rgba(255,255,255,0.08);
+        border:1px solid rgba(255,255,255,0.15);
+        border-radius:14px; padding:20px 24px;
+        text-align:center; color:#e0e0e0;
+        backdrop-filter:blur(6px);
+    }
+    #tip-card .tip-label {
+        font-size:11px; font-weight:700; letter-spacing:1.5px;
+        text-transform:uppercase; color:#a78bfa; margin-bottom:8px;
+    }
+    #tip-card .tip-icon { font-size:22px; margin-bottom:6px; }
+    #tip-card #tip-text { font-size:14px; line-height:1.6; }
+    #tip-card #tip-text.loading { color:#666; font-style:italic; }
 </style>
 </head>
 <body>
 <a href="logout.php">LOGOUT</a>
 <h1>Welcome <?php echo htmlspecialchars($_SESSION['email']); ?></h1>
+
+<!-- ── AI Security Tip Card ── -->
+<div id="tip-card">
+    <div class="tip-icon">&#x1F512;</div>
+    <div class="tip-label">Security Tip of the Session</div>
+    <div id="tip-text" class="loading">Fetching your tip…</div>
+</div>
 
 <!-- ── AI Chat Toggle Button ── -->
 <button id="chat-toggle" title="Ask AI">&#x1F916;</button>
@@ -162,6 +186,20 @@ if (!isset($_SESSION['email'])) {
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
+})();
+
+/* ── AI Security Tip ── */
+(async function () {
+    const tipEl = document.getElementById('tip-text');
+    try {
+        const res  = await fetch('ai_tip.php');
+        if (res.status === 401) { tipEl.textContent = ''; return; }
+        const data = await res.json();
+        tipEl.classList.remove('loading');
+        tipEl.textContent = data.tip || '';
+    } catch (e) {
+        tipEl.textContent = '';
+    }
 })();
 </script>
 </body>

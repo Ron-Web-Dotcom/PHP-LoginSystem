@@ -30,6 +30,7 @@ if ($num == 1 && password_verify($pass, $storedHash)) {
     $_SESSION['email'] = $name;
     header('location:homepage.php');
 } else {
+    $_SESSION['login_failed'] = true;
     header('location:login.php');
 }
 ?>
