@@ -13,7 +13,9 @@ if (!isset($_SESSION['email'])) {
 <link rel="stylesheet" type="text/css" href="style/cleanup.css">
 <style>
     a { color:#fff !important; margin-top:-200px; }
-    h1 { color:#fff !important; margin-top:200px !important; text-align:center; text-transform:uppercase; }
+    h1 { color:#fff !important; margin-top:80px !important; text-align:center; text-transform:uppercase; }
+    .dash-links { text-align:center; margin-top:10px; }
+    .dash-links a { font-size:13px; color:#a78bfa !important; margin:0 10px; }
 
     /* ── Chat widget ── */
     #chat-toggle {
@@ -103,17 +105,99 @@ if (!isset($_SESSION['email'])) {
     #tip-card .tip-icon { font-size:22px; margin-bottom:6px; }
     #tip-card #tip-text { font-size:14px; line-height:1.6; }
     #tip-card #tip-text.loading { color:#666; font-style:italic; }
+
+    /* ── Threat briefing card ── */
+    #threat-card {
+        max-width:480px; margin:14px auto 0;
+        background:rgba(239,68,68,0.07);
+        border:1px solid rgba(239,68,68,0.25);
+        border-radius:14px; padding:18px 24px;
+        color:#e0e0e0; backdrop-filter:blur(6px);
+    }
+    #threat-card .threat-label {
+        font-size:11px; font-weight:700; letter-spacing:1.5px;
+        text-transform:uppercase; color:#f87171; margin-bottom:6px;
+    }
+    #threat-card .threat-name { font-size:15px; font-weight:700; color:#fca5a5; margin-bottom:4px; }
+    #threat-card .threat-desc { font-size:13px; line-height:1.5; margin-bottom:6px; }
+    #threat-card .threat-tip  { font-size:12px; color:#86efac; }
+    #threat-card.loading      { color:#555; font-style:italic; }
+
+    /* ── Quiz card ── */
+    #quiz-card {
+        max-width:480px; margin:14px auto 0;
+        background:rgba(255,255,255,0.07);
+        border:1px solid rgba(255,255,255,0.14);
+        border-radius:14px; padding:20px 24px;
+        color:#e0e0e0; backdrop-filter:blur(6px);
+        text-align:center;
+    }
+    #quiz-card .quiz-label {
+        font-size:11px; font-weight:700; letter-spacing:1.5px;
+        text-transform:uppercase; color:#34d399; margin-bottom:10px;
+    }
+    #quiz-start-btn {
+        background:linear-gradient(135deg,#34d399,#059669);
+        border:none; border-radius:8px; color:#fff;
+        padding:8px 22px; font-size:13px; cursor:pointer;
+        transition:opacity .2s;
+    }
+    #quiz-start-btn:hover { opacity:0.85; }
+    #quiz-start-btn:disabled { opacity:0.45; cursor:not-allowed; }
+    #quiz-body { display:none; text-align:left; margin-top:12px; }
+    #quiz-question { font-size:14px; font-weight:600; color:#f0f0f0; margin-bottom:12px; line-height:1.5; }
+    .quiz-opt {
+        display:block; width:100%; text-align:left;
+        background:rgba(255,255,255,0.06);
+        border:1px solid rgba(255,255,255,0.14);
+        border-radius:8px; padding:8px 12px;
+        color:#d0d0d0; font-size:13px; cursor:pointer;
+        margin-bottom:7px; transition:background .15s;
+    }
+    .quiz-opt:hover:not(:disabled) { background:rgba(255,255,255,0.12); }
+    .quiz-opt.correct { background:rgba(34,197,94,0.2); border-color:#22c55e; color:#86efac; }
+    .quiz-opt.wrong   { background:rgba(239,68,68,0.2);  border-color:#ef4444; color:#fca5a5; }
+    #quiz-result { font-size:13px; margin-top:10px; line-height:1.5; min-height:18px; }
+    #quiz-next-btn {
+        display:none; margin-top:12px;
+        background:none; border:1px solid rgba(52,211,153,0.4);
+        border-radius:8px; color:#34d399;
+        padding:6px 18px; font-size:13px; cursor:pointer;
+        transition:background .2s;
+    }
+    #quiz-next-btn:hover { background:rgba(52,211,153,0.1); }
 </style>
 </head>
 <body>
 <a href="logout.php">LOGOUT</a>
 <h1>Welcome <?php echo htmlspecialchars($_SESSION['email']); ?></h1>
+<div class="dash-links">
+    <a href="change_password.php">&#x1F511; Change Password</a>
+</div>
 
 <!-- ── AI Security Tip Card ── -->
 <div id="tip-card">
     <div class="tip-icon">&#x1F512;</div>
     <div class="tip-label">Security Tip of the Session</div>
     <div id="tip-text" class="loading">Fetching your tip…</div>
+</div>
+
+<!-- ── AI Threat Briefing Card ── -->
+<div id="threat-card">
+    <div class="threat-label">&#x26A0; Threat of the Session</div>
+    <div id="threat-inner" style="color:#555;font-style:italic;font-size:13px">Loading…</div>
+</div>
+
+<!-- ── AI Security Quiz Card ── -->
+<div id="quiz-card">
+    <div class="quiz-label">&#x1F9E0; Security Quiz</div>
+    <button id="quiz-start-btn">Take a Question</button>
+    <div id="quiz-body">
+        <div id="quiz-question"></div>
+        <div id="quiz-options"></div>
+        <div id="quiz-result"></div>
+        <button id="quiz-next-btn">Next Question &rarr;</button>
+    </div>
 </div>
 
 <!-- ── AI Chat Toggle Button ── -->
@@ -200,6 +284,84 @@ if (!isset($_SESSION['email'])) {
     } catch (e) {
         tipEl.textContent = '';
     }
+})();
+
+/* ── AI Threat Briefing ── */
+(async function () {
+    const inner = document.getElementById('threat-inner');
+    try {
+        const res  = await fetch('ai_threat.php');
+        if (res.status === 401) { inner.textContent = ''; return; }
+        const data = await res.json();
+        inner.style.cssText = 'font-style:normal';
+        inner.innerHTML =
+            `<div class="threat-name">${data.threat}</div>`
+          + `<div class="threat-desc">${data.description}</div>`
+          + `<div class="threat-tip">&#x1F6E1; ${data.tip}</div>`;
+    } catch (e) {
+        inner.textContent = '';
+    }
+})();
+
+/* ── AI Security Quiz ── */
+(function () {
+    const startBtn  = document.getElementById('quiz-start-btn');
+    const body      = document.getElementById('quiz-body');
+    const questionEl= document.getElementById('quiz-question');
+    const optionsEl = document.getElementById('quiz-options');
+    const resultEl  = document.getElementById('quiz-result');
+    const nextBtn   = document.getElementById('quiz-next-btn');
+
+    async function loadQuestion() {
+        startBtn.disabled    = true;
+        startBtn.textContent = 'Loading…';
+        body.style.display   = 'none';
+        optionsEl.innerHTML  = '';
+        resultEl.textContent = '';
+        nextBtn.style.display= 'none';
+
+        try {
+            const res  = await fetch('ai_quiz.php');
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            questionEl.textContent = data.question;
+            optionsEl.innerHTML = data.options.map((opt, i) =>
+                `<button class="quiz-opt" data-i="${i}">${opt}</button>`
+            ).join('');
+
+            optionsEl.querySelectorAll('.quiz-opt').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const chosen = parseInt(this.dataset.i);
+                    optionsEl.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
+                    if (chosen === data.answer) {
+                        this.classList.add('correct');
+                        resultEl.textContent  = '✔ Correct! ' + data.explanation;
+                        resultEl.style.color  = '#86efac';
+                    } else {
+                        this.classList.add('wrong');
+                        optionsEl.querySelector(`[data-i="${data.answer}"]`).classList.add('correct');
+                        resultEl.textContent  = '✖ Not quite. ' + data.explanation;
+                        resultEl.style.color  = '#fca5a5';
+                    }
+                    nextBtn.style.display = 'inline-block';
+                });
+            });
+
+            body.style.display   = 'block';
+            startBtn.style.display = 'none';
+        } catch (e) {
+            startBtn.textContent = 'Try Again';
+            startBtn.disabled    = false;
+        }
+    }
+
+    startBtn.addEventListener('click', loadQuestion);
+    nextBtn.addEventListener('click', () => {
+        startBtn.style.display = 'inline-block';
+        startBtn.textContent   = 'Next Question';
+        loadQuestion();
+    });
 })();
 </script>
 </body>
