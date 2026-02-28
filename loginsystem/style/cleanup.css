@@ -1,7 +1,12 @@
 body{
-
 background:linear-gradient(rgba(0,0,50,0.5),rgba(0,0,50,0.5)),url(thumb.png) ;
 background-size: cover;
+}
+
+/* ── Light mode body ── */
+body.light-mode {
+    background: linear-gradient(135deg, #e8eaf6, #f3e5f5) !important;
+    background-size: cover !important;
 }
 .login-box{
     max-width:700px;

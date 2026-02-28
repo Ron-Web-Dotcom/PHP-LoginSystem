@@ -1,10 +1,5 @@
 <?php
-session_start();
-
-if (!isset($_SESSION['email'])) {
-    header('location:login.php');
-    exit();
-}
+require_once 'auth_check.php';   // session_start + remember-me cookie
 
 // Fetch last 5 logins for the session-activity card
 $recentLogins = [];
@@ -23,6 +18,7 @@ if ($_con) {
     }
     mysqli_close($_con);
 }
+$isAdmin = !empty($_SESSION['is_admin']);
 ?>
 <html>
 <head>
@@ -31,9 +27,20 @@ if ($_con) {
 <link rel="stylesheet" type="text/css" href="style/cleanup.css">
 <style>
     a { color:#fff !important; margin-top:-200px; }
-    h1 { color:#fff !important; margin-top:80px !important; text-align:center; text-transform:uppercase; }
-    .dash-links { text-align:center; margin-top:10px; }
-    .dash-links a { font-size:13px; color:#a78bfa !important; margin:0 10px; }
+    h1 { color:#fff !important; margin-top:70px !important; text-align:center; text-transform:uppercase; }
+    .dash-links { text-align:center; margin-top:10px; flex-wrap:wrap; display:flex; justify-content:center; gap:4px 14px; }
+    .dash-links a { font-size:13px; color:#a78bfa !important; }
+
+    /* ── Theme toggle ── */
+    #theme-toggle {
+        position:fixed; top:18px; right:20px;
+        background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+        border-radius:50%; width:38px; height:38px; font-size:18px;
+        cursor:pointer; color:#fff; z-index:500;
+        display:flex; align-items:center; justify-content:center;
+        transition:background .2s;
+    }
+    #theme-toggle:hover { background:rgba(255,255,255,0.2); }
 
     /* ── Chat widget ── */
     #chat-toggle {
@@ -46,7 +53,6 @@ if ($_con) {
         transition:transform .2s;
     }
     #chat-toggle:hover { transform:scale(1.1); }
-
     #chat-window {
         display:none; position:fixed; bottom:96px; right:28px;
         width:340px; max-height:480px;
@@ -56,24 +62,18 @@ if ($_con) {
         border:1px solid rgba(255,255,255,0.08);
     }
     #chat-window.open { display:flex; }
-
     #chat-header {
         padding:14px 16px;
         background:linear-gradient(135deg,#667eea,#764ba2);
         color:#fff; font-weight:600; font-size:14px;
         display:flex; align-items:center; gap:8px;
     }
-    #chat-header span.dot {
-        width:8px; height:8px; border-radius:50%;
-        background:#4ade80; display:inline-block;
-    }
-
+    #chat-header span.dot { width:8px; height:8px; border-radius:50%; background:#4ade80; display:inline-block; }
     #chat-messages {
         flex:1; overflow-y:auto; padding:14px;
         display:flex; flex-direction:column; gap:10px;
         scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.2) transparent;
     }
-
     .msg { max-width:82%; font-size:13px; line-height:1.5; word-break:break-word; }
     .msg.user {
         align-self:flex-end;
@@ -86,11 +86,9 @@ if ($_con) {
         border-radius:14px 14px 14px 2px; padding:9px 13px;
     }
     .msg.bot.thinking { color:#888; font-style:italic; }
-
     #chat-input-row {
         display:flex; padding:10px; gap:8px;
-        border-top:1px solid rgba(255,255,255,0.08);
-        background:#1e1e2e;
+        border-top:1px solid rgba(255,255,255,0.08); background:#1e1e2e;
     }
     #chat-input {
         flex:1; border:1px solid rgba(255,255,255,0.15); border-radius:10px;
@@ -101,20 +99,38 @@ if ($_con) {
     #chat-send {
         background:linear-gradient(135deg,#667eea,#764ba2);
         border:none; border-radius:10px; color:#fff;
-        padding:0 14px; cursor:pointer; font-size:16px;
-        transition:opacity .2s;
+        padding:0 14px; cursor:pointer; font-size:16px; transition:opacity .2s;
     }
     #chat-send:hover { opacity:0.85; }
     #chat-send:disabled { opacity:0.4; cursor:not-allowed; }
 
+    /* ── Security score card ── */
+    #score-card {
+        max-width:480px; margin:24px auto 0;
+        background:rgba(255,255,255,0.07);
+        border:1px solid rgba(255,255,255,0.12);
+        border-radius:14px; padding:18px 24px;
+        color:#e0e0e0; backdrop-filter:blur(6px);
+    }
+    #score-card .score-label {
+        font-size:11px; font-weight:700; letter-spacing:1.5px;
+        text-transform:uppercase; color:#a78bfa; margin-bottom:10px;
+    }
+    .score-header { display:flex; align-items:center; gap:14px; margin-bottom:8px; }
+    .score-grade  { font-size:40px; font-weight:800; line-height:1; }
+    .score-meta   { flex:1; }
+    .score-value  { font-size:22px; font-weight:700; }
+    .score-summary { font-size:13px; color:#94a3b8; margin-top:2px; }
+    .score-recs   { padding-left:18px; margin:8px 0 0; }
+    .score-recs li { font-size:12px; color:#9ca3af; margin-bottom:3px; line-height:1.5; }
+
     /* ── Security tip card ── */
     #tip-card {
-        max-width:480px; margin:24px auto 0;
+        max-width:480px; margin:14px auto 0;
         background:rgba(255,255,255,0.08);
         border:1px solid rgba(255,255,255,0.15);
         border-radius:14px; padding:20px 24px;
-        text-align:center; color:#e0e0e0;
-        backdrop-filter:blur(6px);
+        text-align:center; color:#e0e0e0; backdrop-filter:blur(6px);
     }
     #tip-card .tip-label {
         font-size:11px; font-weight:700; letter-spacing:1.5px;
@@ -139,7 +155,6 @@ if ($_con) {
     #threat-card .threat-name { font-size:15px; font-weight:700; color:#fca5a5; margin-bottom:4px; }
     #threat-card .threat-desc { font-size:13px; line-height:1.5; margin-bottom:6px; }
     #threat-card .threat-tip  { font-size:12px; color:#86efac; }
-    #threat-card.loading      { color:#555; font-style:italic; }
 
     /* ── Quiz card ── */
     #quiz-card {
@@ -147,8 +162,7 @@ if ($_con) {
         background:rgba(255,255,255,0.07);
         border:1px solid rgba(255,255,255,0.14);
         border-radius:14px; padding:20px 24px;
-        color:#e0e0e0; backdrop-filter:blur(6px);
-        text-align:center;
+        color:#e0e0e0; backdrop-filter:blur(6px); text-align:center;
     }
     #quiz-card .quiz-label {
         font-size:11px; font-weight:700; letter-spacing:1.5px;
@@ -157,8 +171,7 @@ if ($_con) {
     #quiz-start-btn {
         background:linear-gradient(135deg,#34d399,#059669);
         border:none; border-radius:8px; color:#fff;
-        padding:8px 22px; font-size:13px; cursor:pointer;
-        transition:opacity .2s;
+        padding:8px 22px; font-size:13px; cursor:pointer; transition:opacity .2s;
     }
     #quiz-start-btn:hover { opacity:0.85; }
     #quiz-start-btn:disabled { opacity:0.45; cursor:not-allowed; }
@@ -166,11 +179,9 @@ if ($_con) {
     #quiz-question { font-size:14px; font-weight:600; color:#f0f0f0; margin-bottom:12px; line-height:1.5; }
     .quiz-opt {
         display:block; width:100%; text-align:left;
-        background:rgba(255,255,255,0.06);
-        border:1px solid rgba(255,255,255,0.14);
-        border-radius:8px; padding:8px 12px;
-        color:#d0d0d0; font-size:13px; cursor:pointer;
-        margin-bottom:7px; transition:background .15s;
+        background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14);
+        border-radius:8px; padding:8px 12px; color:#d0d0d0; font-size:13px;
+        cursor:pointer; margin-bottom:7px; transition:background .15s;
     }
     .quiz-opt:hover:not(:disabled) { background:rgba(255,255,255,0.12); }
     .quiz-opt.correct { background:rgba(34,197,94,0.2); border-color:#22c55e; color:#86efac; }
@@ -180,8 +191,7 @@ if ($_con) {
         display:none; margin-top:12px;
         background:none; border:1px solid rgba(52,211,153,0.4);
         border-radius:8px; color:#34d399;
-        padding:6px 18px; font-size:13px; cursor:pointer;
-        transition:background .2s;
+        padding:6px 18px; font-size:13px; cursor:pointer; transition:background .2s;
     }
     #quiz-next-btn:hover { background:rgba(52,211,153,0.1); }
 
@@ -203,14 +213,58 @@ if ($_con) {
     .log-time { color:#94a3b8; }
     .log-ip   { color:#64748b; font-family:monospace; text-align:right; }
     .log-current { color:#86efac; font-weight:600; }
+
+    /* ── Light mode overrides ── */
+    body.light-mode h1    { color:#1a1a2e !important; }
+    body.light-mode a     { color:#1a1a2e !important; }
+    body.light-mode .dash-links a { color:#5b21b6 !important; }
+    body.light-mode #theme-toggle { background:rgba(0,0,0,0.08); border-color:rgba(0,0,0,0.15); color:#1a1a2e; }
+    body.light-mode #score-card,
+    body.light-mode #tip-card,
+    body.light-mode #quiz-card,
+    body.light-mode #session-log-card {
+        background:rgba(255,255,255,0.88); border-color:rgba(0,0,0,0.1); color:#374151;
+    }
+    body.light-mode #threat-card { background:rgba(239,68,68,0.05); border-color:rgba(239,68,68,0.2); }
+    body.light-mode #tip-card .tip-label  { color:#7c3aed; }
+    body.light-mode #quiz-card .quiz-label { color:#059669; }
+    body.light-mode .quiz-opt { background:#f9fafb; border-color:rgba(0,0,0,0.12); color:#374151; }
+    body.light-mode .quiz-opt:hover:not(:disabled) { background:#e0e7ff; }
+    body.light-mode #quiz-question { color:#1f2937; }
+    body.light-mode .score-summary { color:#6b7280; }
+    body.light-mode .score-recs li { color:#6b7280; }
+    body.light-mode .log-time { color:#4b5563; }
+    body.light-mode .log-ip   { color:#6b7280; }
+    body.light-mode #chat-window { background:#f8fafc; border-color:rgba(0,0,0,0.1); }
+    body.light-mode #chat-input-row { background:#f8fafc; border-color:rgba(0,0,0,0.1); }
+    body.light-mode #chat-input { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.15); color:#1a1a2e; }
+    body.light-mode #chat-input::placeholder { color:#9ca3af; }
+    body.light-mode .msg.bot { background:rgba(0,0,0,0.06); color:#1f2937; }
 </style>
 </head>
 <body>
+
+<!-- Theme toggle button -->
+<button id="theme-toggle" title="Toggle light/dark mode">&#x1F319;</button>
+
 <a href="logout.php">LOGOUT</a>
 <h1>Welcome <?php echo htmlspecialchars($_SESSION['email']); ?></h1>
+
 <div class="dash-links">
+    <a href="profile.php">&#x1F464; Profile</a>
+    <a href="totp_setup.php">&#x1F510; 2FA Setup</a>
     <a href="change_password.php">&#x1F511; Change Password</a>
     <a href="phishing.php">&#x1F3A3; Phishing Detector</a>
+    <a href="export_log.php">&#x1F4E5; Export Log</a>
+    <?php if ($isAdmin): ?>
+    <a href="admin.php" style="color:#f97316 !important">&#x1F6E1; Admin</a>
+    <?php endif; ?>
+</div>
+
+<!-- ── AI Security Score Card ── -->
+<div id="score-card">
+    <div class="score-label">&#x1F6E1; Account Security Score</div>
+    <div id="score-inner" style="color:#555;font-style:italic;font-size:13px">Calculating…</div>
 </div>
 
 <!-- ── AI Security Tip Card ── -->
@@ -247,11 +301,8 @@ if ($_con) {
         <tr>
             <td class="<?php echo $i === 0 ? 'log-current' : 'log-time'; ?>">
                 <?php
-                if ($i === 0) {
-                    echo '&#x25CF; Current session';
-                } else {
-                    echo htmlspecialchars(date('M j, g:i a', strtotime($login['login_time'])));
-                }
+                if ($i === 0) echo '&#x25CF; Current session';
+                else echo htmlspecialchars(date('M j, g:i a', strtotime($login['login_time'])));
                 ?>
             </td>
             <td class="log-ip"><?php echo htmlspecialchars($login['ip']); ?></td>
@@ -279,6 +330,56 @@ if ($_con) {
 </div>
 
 <script>
+/* ── 0. Theme toggle ── */
+(function () {
+    const btn  = document.getElementById('theme-toggle');
+    const body = document.body;
+    const DARK_ICON  = '\u{1F319}';  // moon
+    const LIGHT_ICON = '\u2600\uFE0F'; // sun
+
+    if (localStorage.getItem('theme') === 'light') {
+        body.classList.add('light-mode');
+        btn.textContent = LIGHT_ICON;
+    } else {
+        btn.textContent = DARK_ICON;
+    }
+
+    btn.addEventListener('click', function () {
+        body.classList.toggle('light-mode');
+        const light = body.classList.contains('light-mode');
+        localStorage.setItem('theme', light ? 'light' : 'dark');
+        this.textContent = light ? LIGHT_ICON : DARK_ICON;
+    });
+})();
+
+/* ── 1. AI Security Score ── */
+(async function () {
+    const inner = document.getElementById('score-inner');
+    function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+    try {
+        const res  = await fetch('ai_security_score.php');
+        const data = await res.json();
+        if (data.error) { inner.textContent = 'Score unavailable.'; return; }
+
+        const color = data.color || '#94a3b8';
+        const recs  = (data.recommendations || [])
+            .map(r => `<li>${esc(r)}</li>`).join('');
+        inner.style.fontStyle = 'normal';
+        inner.innerHTML =
+            `<div class="score-header">
+                <div class="score-grade" style="color:${color}">${esc(data.grade)}</div>
+                <div class="score-meta">
+                    <div class="score-value" style="color:${color}">${esc(data.score)}<span style="font-size:14px;color:#64748b">/100</span></div>
+                    <div class="score-summary">${esc(data.summary || '')}</div>
+                </div>
+            </div>
+            ${recs ? '<ul class="score-recs">' + recs + '</ul>' : ''}`;
+    } catch (e) {
+        inner.textContent = '';
+    }
+})();
+
+/* ── 2. Chat widget ── */
 (function () {
     const toggle   = document.getElementById('chat-toggle');
     const win      = document.getElementById('chat-window');
@@ -303,16 +404,13 @@ if ($_con) {
     async function send() {
         const text = input.value.trim();
         if (!text) return;
-
         input.value = '';
         sendBtn.disabled = true;
         addMsg(text, 'user');
         const thinking = addMsg('Thinking…', 'bot thinking');
-
         try {
             const res = await fetch('ai_chat.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text })
             });
             const data = await res.json();
@@ -333,7 +431,7 @@ if ($_con) {
     });
 })();
 
-/* ── AI Security Tip ── */
+/* ── 3. AI Security Tip ── */
 (async function () {
     const tipEl = document.getElementById('tip-text');
     try {
@@ -342,36 +440,33 @@ if ($_con) {
         const data = await res.json();
         tipEl.classList.remove('loading');
         tipEl.textContent = data.tip || '';
-    } catch (e) {
-        tipEl.textContent = '';
-    }
+    } catch (e) { tipEl.textContent = ''; }
 })();
 
-/* ── AI Threat Briefing ── */
+/* ── 4. AI Threat Briefing ── */
 (async function () {
     const inner = document.getElementById('threat-inner');
+    function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
     try {
         const res  = await fetch('ai_threat.php');
         if (res.status === 401) { inner.textContent = ''; return; }
         const data = await res.json();
         inner.style.cssText = 'font-style:normal';
         inner.innerHTML =
-            `<div class="threat-name">${data.threat}</div>`
-          + `<div class="threat-desc">${data.description}</div>`
-          + `<div class="threat-tip">&#x1F6E1; ${data.tip}</div>`;
-    } catch (e) {
-        inner.textContent = '';
-    }
+            `<div class="threat-name">${esc(data.threat)}</div>`
+          + `<div class="threat-desc">${esc(data.description)}</div>`
+          + `<div class="threat-tip">&#x1F6E1; ${esc(data.tip)}</div>`;
+    } catch (e) { inner.textContent = ''; }
 })();
 
-/* ── AI Security Quiz ── */
+/* ── 5. AI Security Quiz ── */
 (function () {
-    const startBtn  = document.getElementById('quiz-start-btn');
-    const body      = document.getElementById('quiz-body');
-    const questionEl= document.getElementById('quiz-question');
-    const optionsEl = document.getElementById('quiz-options');
-    const resultEl  = document.getElementById('quiz-result');
-    const nextBtn   = document.getElementById('quiz-next-btn');
+    const startBtn   = document.getElementById('quiz-start-btn');
+    const body       = document.getElementById('quiz-body');
+    const questionEl = document.getElementById('quiz-question');
+    const optionsEl  = document.getElementById('quiz-options');
+    const resultEl   = document.getElementById('quiz-result');
+    const nextBtn    = document.getElementById('quiz-next-btn');
 
     async function loadQuestion() {
         startBtn.disabled    = true;
@@ -380,36 +475,32 @@ if ($_con) {
         optionsEl.innerHTML  = '';
         resultEl.textContent = '';
         nextBtn.style.display= 'none';
-
         try {
             const res  = await fetch('ai_quiz.php');
             const data = await res.json();
             if (data.error) throw new Error(data.error);
-
             questionEl.textContent = data.question;
             optionsEl.innerHTML = data.options.map((opt, i) =>
                 `<button class="quiz-opt" data-i="${i}">${opt}</button>`
             ).join('');
-
             optionsEl.querySelectorAll('.quiz-opt').forEach(btn => {
                 btn.addEventListener('click', function () {
                     const chosen = parseInt(this.dataset.i);
                     optionsEl.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
                     if (chosen === data.answer) {
                         this.classList.add('correct');
-                        resultEl.textContent  = '✔ Correct! ' + data.explanation;
-                        resultEl.style.color  = '#86efac';
+                        resultEl.textContent = '✔ Correct! ' + data.explanation;
+                        resultEl.style.color = '#86efac';
                     } else {
                         this.classList.add('wrong');
                         optionsEl.querySelector(`[data-i="${data.answer}"]`).classList.add('correct');
-                        resultEl.textContent  = '✖ Not quite. ' + data.explanation;
-                        resultEl.style.color  = '#fca5a5';
+                        resultEl.textContent = '✖ Not quite. ' + data.explanation;
+                        resultEl.style.color = '#fca5a5';
                     }
                     nextBtn.style.display = 'inline-block';
                 });
             });
-
-            body.style.display   = 'block';
+            body.style.display     = 'block';
             startBtn.style.display = 'none';
         } catch (e) {
             startBtn.textContent = 'Try Again';

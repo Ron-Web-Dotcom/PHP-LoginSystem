@@ -1,5 +1,17 @@
 <?php
 session_start();
+
+// If already logged in (or valid remember-me cookie), skip to dashboard
+if (!isset($_SESSION['email']) && !empty($_COOKIE['remember_token'])) {
+    // Let auth_check.php handle cookie verification on homepage
+    header('location:homepage.php');
+    exit();
+}
+if (isset($_SESSION['email'])) {
+    header('location:homepage.php');
+    exit();
+}
+
 $loginFailed = false;
 $lockedOut   = false;
 if (!empty($_SESSION['lockout'])) {
@@ -150,7 +162,14 @@ if (!empty($_SESSION['login_failed'])) {
 <label>Password</label>
 <input type="password" name="password" class="form-control" required>
 </div>
-<button type="submit" class="btn btn-success"> SignIn </button>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+    <div class="form-check" style="margin:0">
+        <input class="form-check-input" type="checkbox" name="remember_me" id="remember-me" value="1">
+        <label class="form-check-label" for="remember-me" style="font-size:13px;cursor:pointer">Remember me</label>
+    </div>
+    <a href="forgot_password.php" style="font-size:13px;color:#667eea">Forgot password?</a>
+</div>
+<button type="submit" class="btn btn-success mt-2" style="width:100%"> Sign In </button>
 </form>
 </div>
 
