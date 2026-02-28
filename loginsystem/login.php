@@ -1,6 +1,12 @@
 <?php
 session_start();
 $loginFailed = false;
+$lockedOut   = false;
+if (!empty($_SESSION['lockout'])) {
+    $lockedOut   = true;
+    $loginFailed = true;
+    unset($_SESSION['lockout']);
+}
 if (!empty($_SESSION['login_failed'])) {
     $loginFailed = true;
     unset($_SESSION['login_failed']);
@@ -115,7 +121,13 @@ if (!empty($_SESSION['login_failed'])) {
 <div class="container">
 <div class="login-box">
 
-<?php if ($loginFailed): ?>
+<?php if ($lockedOut): ?>
+<!-- ── Account Lockout Banner ── -->
+<div class="alert alert-danger py-2 mb-3" style="font-size:13px;border-radius:10px">
+    <strong>&#x1F6AB; Account temporarily locked.</strong>
+    Too many failed attempts. Please wait <strong>15 minutes</strong> before trying again.
+</div>
+<?php elseif ($loginFailed): ?>
 <!-- ── AI Login Failure Help ── -->
 <div id="ai-help-box">
     <button id="ai-help-close" title="Dismiss">&times;</button>

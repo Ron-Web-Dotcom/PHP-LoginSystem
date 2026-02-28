@@ -5,6 +5,24 @@ if (!isset($_SESSION['email'])) {
     header('location:login.php');
     exit();
 }
+
+// Fetch last 5 logins for the session-activity card
+$recentLogins = [];
+$_con = mysqli_connect('localhost', 'root', '', 'system');
+if ($_con) {
+    $tcheck = mysqli_query($_con, "SHOW TABLES LIKE 'tbl_session_log'");
+    if ($tcheck && mysqli_num_rows($tcheck) > 0) {
+        $_s = mysqli_prepare($_con,
+            "SELECT ip, login_time FROM tbl_session_log WHERE email = ? ORDER BY login_time DESC LIMIT 5"
+        );
+        mysqli_stmt_bind_param($_s, 's', $_SESSION['email']);
+        mysqli_stmt_execute($_s);
+        $_r = mysqli_stmt_get_result($_s);
+        while ($row = mysqli_fetch_assoc($_r)) { $recentLogins[] = $row; }
+        mysqli_stmt_close($_s);
+    }
+    mysqli_close($_con);
+}
 ?>
 <html>
 <head>
@@ -166,6 +184,25 @@ if (!isset($_SESSION['email'])) {
         transition:background .2s;
     }
     #quiz-next-btn:hover { background:rgba(52,211,153,0.1); }
+
+    /* ── Session activity log card ── */
+    #session-log-card {
+        max-width:480px; margin:14px auto 40px;
+        background:rgba(255,255,255,0.05);
+        border:1px solid rgba(255,255,255,0.1);
+        border-radius:14px; padding:18px 24px;
+        color:#e0e0e0; backdrop-filter:blur(6px);
+    }
+    #session-log-card .log-label {
+        font-size:11px; font-weight:700; letter-spacing:1.5px;
+        text-transform:uppercase; color:#60a5fa; margin-bottom:10px;
+    }
+    .log-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .log-table td { padding:6px 4px; border-bottom:1px solid rgba(255,255,255,0.06); }
+    .log-table tr:last-child td { border-bottom:none; }
+    .log-time { color:#94a3b8; }
+    .log-ip   { color:#64748b; font-family:monospace; text-align:right; }
+    .log-current { color:#86efac; font-weight:600; }
 </style>
 </head>
 <body>
@@ -173,6 +210,7 @@ if (!isset($_SESSION['email'])) {
 <h1>Welcome <?php echo htmlspecialchars($_SESSION['email']); ?></h1>
 <div class="dash-links">
     <a href="change_password.php">&#x1F511; Change Password</a>
+    <a href="phishing.php">&#x1F3A3; Phishing Detector</a>
 </div>
 
 <!-- ── AI Security Tip Card ── -->
@@ -199,6 +237,29 @@ if (!isset($_SESSION['email'])) {
         <button id="quiz-next-btn">Next Question &rarr;</button>
     </div>
 </div>
+
+<!-- ── Session Activity Log ── -->
+<?php if (!empty($recentLogins)): ?>
+<div id="session-log-card">
+    <div class="log-label">&#x1F4CB; Recent Login Activity</div>
+    <table class="log-table">
+        <?php foreach ($recentLogins as $i => $login): ?>
+        <tr>
+            <td class="<?php echo $i === 0 ? 'log-current' : 'log-time'; ?>">
+                <?php
+                if ($i === 0) {
+                    echo '&#x25CF; Current session';
+                } else {
+                    echo htmlspecialchars(date('M j, g:i a', strtotime($login['login_time'])));
+                }
+                ?>
+            </td>
+            <td class="log-ip"><?php echo htmlspecialchars($login['ip']); ?></td>
+        </tr>
+        <?php endforeach; ?>
+    </table>
+</div>
+<?php endif; ?>
 
 <!-- ── AI Chat Toggle Button ── -->
 <button id="chat-toggle" title="Ask AI">&#x1F916;</button>
