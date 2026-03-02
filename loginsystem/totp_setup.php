@@ -53,8 +53,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($s);
             mysqli_stmt_close($s);
             $currentEnabled = 1;
-            $message = '2FA is now active on your account.';
+            $message = '2FA is now active. Save your backup codes below!';
             $msgType = 'success';
+
+            // Auto-generate 8 backup codes on 2FA enable
+            mysqli_query($con, "CREATE TABLE IF NOT EXISTS tbl_backup_codes (
+                id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(255) NOT NULL,
+                code_hash VARCHAR(64) NOT NULL, used_at DATETIME NULL,
+                created_at DATETIME NOT NULL, INDEX idx_email (email)
+            )");
+            // Delete any old codes
+            $bcd = mysqli_prepare($con, "DELETE FROM tbl_backup_codes WHERE email = ?");
+            mysqli_stmt_bind_param($bcd, 's', $email);
+            mysqli_stmt_execute($bcd);
+            mysqli_stmt_close($bcd);
+            // Generate 8 new ones
+            $bcNow = date('Y-m-d H:i:s');
+            $_SESSION['new_backup_codes'] = [];
+            for ($i = 0; $i < 8; $i++) {
+                $raw  = bin2hex(random_bytes(6));
+                $fmt  = strtoupper(substr($raw,0,4).'-'.substr($raw,4,4).'-'.substr($raw,8,4));
+                $hash = hash('sha256', strtolower(str_replace('-','',$raw)));
+                $_SESSION['new_backup_codes'][] = $fmt;
+                $bci = mysqli_prepare($con,
+                    "INSERT INTO tbl_backup_codes (email,code_hash,created_at) VALUES (?,?,?)"
+                );
+                mysqli_stmt_bind_param($bci, 'sss', $email, $hash, $bcNow);
+                mysqli_stmt_execute($bci);
+                mysqli_stmt_close($bci);
+            }
+
+            // Audit log
+            $tblAl = mysqli_query($con, "SHOW TABLES LIKE 'tbl_audit_log'");
+            if ($tblAl && mysqli_num_rows($tblAl) > 0) {
+                $now = date('Y-m-d H:i:s');
+                $ip  = $_SERVER['REMOTE_ADDR'] ?? '';
+                $ev  = '2fa_enabled'; $dt = '2FA activated';
+                $als = mysqli_prepare($con,
+                    "INSERT INTO tbl_audit_log (email,event,detail,ip,created_at) VALUES (?,?,?,?,?)"
+                );
+                mysqli_stmt_bind_param($als, 'sssss', $email, $ev, $dt, $ip, $now);
+                mysqli_stmt_execute($als);
+                mysqli_stmt_close($als);
+            }
         } else {
             $showQr  = true;
             $message = 'Code did not match — please try again.';
@@ -70,6 +111,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $currentSecret  = null;
         $message = '2FA has been disabled.';
         $msgType = 'warning';
+
+        // Audit log
+        $tblAl = mysqli_query($con, "SHOW TABLES LIKE 'tbl_audit_log'");
+        if ($tblAl && mysqli_num_rows($tblAl) > 0) {
+            $now = date('Y-m-d H:i:s');
+            $ip  = $_SERVER['REMOTE_ADDR'] ?? '';
+            $ev  = '2fa_disabled'; $dt = '2FA deactivated';
+            $als = mysqli_prepare($con,
+                "INSERT INTO tbl_audit_log (email,event,detail,ip,created_at) VALUES (?,?,?,?,?)"
+            );
+            mysqli_stmt_bind_param($als, 'sssss', $email, $ev, $dt, $ip, $now);
+            mysqli_stmt_execute($als);
+            mysqli_stmt_close($als);
+        }
     }
 }
 
@@ -144,10 +199,33 @@ $qrUrl = ($showQr && $currentSecret) ? totp_qr_url($email, $currentSecret) : nul
 
     <?php if ($currentEnabled): ?>
     <!-- ── 2FA is ON ── -->
+    <?php if (!empty($_SESSION['new_backup_codes'])): ?>
+    <!-- Show newly generated backup codes once -->
+    <div style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#a78bfa;margin-bottom:8px">
+            &#x1F5DD; Backup Codes — save these now (shown once only)
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:10px">
+            <?php foreach ($_SESSION['new_backup_codes'] as $bc): ?>
+            <div style="background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.25);border-radius:6px;padding:6px 10px;font-family:monospace;font-size:14px;font-weight:700;color:#c4b5fd;text-align:center;letter-spacing:2px">
+                <?= htmlspecialchars($bc) ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <button onclick="window.print()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#d0d0d0;padding:5px 14px;font-size:12px;cursor:pointer">
+            &#x1F5A8; Print backup codes
+        </button>
+    </div>
+    <?php unset($_SESSION['new_backup_codes']); ?>
+    <?php endif; ?>
+
     <p style="font-size:13px;color:#d0d0d0">
         Your account is protected with two-factor authentication.
         Each login will require a 6-digit code from your authenticator app.
     </p>
+    <a href="backup_codes.php" class="btn-action btn-enable" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px">
+        &#x1F5DD; Manage Backup Codes
+    </a>
     <form method="post">
         <input type="hidden" name="action" value="disable">
         <button type="submit" class="btn-action btn-disable"

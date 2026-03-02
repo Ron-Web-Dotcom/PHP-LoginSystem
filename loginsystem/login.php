@@ -12,12 +12,26 @@ if (isset($_SESSION['email'])) {
     exit();
 }
 
-$loginFailed = false;
-$lockedOut   = false;
+$loginFailed   = false;
+$lockedOut     = false;
+$ipBlocked     = false;
+$accountStatus = '';
+$deleted       = !empty($_GET['deleted']);
+
 if (!empty($_SESSION['lockout'])) {
     $lockedOut   = true;
     $loginFailed = true;
     unset($_SESSION['lockout']);
+}
+if (!empty($_SESSION['ip_blocked'])) {
+    $ipBlocked   = true;
+    $loginFailed = true;
+    unset($_SESSION['ip_blocked']);
+}
+if (!empty($_SESSION['account_status'])) {
+    $accountStatus = $_SESSION['account_status'];
+    $loginFailed   = true;
+    unset($_SESSION['account_status']);
 }
 if (!empty($_SESSION['login_failed'])) {
     $loginFailed = true;
@@ -133,11 +147,32 @@ if (!empty($_SESSION['login_failed'])) {
 <div class="container">
 <div class="login-box">
 
+<?php if ($deleted): ?>
+<div class="alert alert-success py-2 mb-3" style="font-size:13px;border-radius:10px">
+    &#x2705; Your account has been permanently deleted. Sorry to see you go.
+</div>
+<?php endif; ?>
+
 <?php if ($lockedOut): ?>
 <!-- ── Account Lockout Banner ── -->
 <div class="alert alert-danger py-2 mb-3" style="font-size:13px;border-radius:10px">
     <strong>&#x1F6AB; Account temporarily locked.</strong>
     Too many failed attempts. Please wait <strong>15 minutes</strong> before trying again.
+</div>
+<?php elseif ($ipBlocked): ?>
+<div class="alert alert-danger py-2 mb-3" style="font-size:13px;border-radius:10px">
+    <strong>&#x1F6AB; Access denied.</strong>
+    Your IP address has been blocked. Contact support if you believe this is an error.
+</div>
+<?php elseif ($accountStatus === 'pending'): ?>
+<div class="alert alert-warning py-2 mb-3" style="font-size:13px;border-radius:10px">
+    <strong>&#x23F3; Account pending approval.</strong>
+    An administrator must approve your account before you can log in.
+</div>
+<?php elseif ($accountStatus === 'rejected'): ?>
+<div class="alert alert-danger py-2 mb-3" style="font-size:13px;border-radius:10px">
+    <strong>&#x274C; Account rejected.</strong>
+    Your registration was not approved. Contact support for assistance.
 </div>
 <?php elseif ($loginFailed): ?>
 <!-- ── AI Login Failure Help ── -->
@@ -167,7 +202,13 @@ if (!empty($_SESSION['login_failed'])) {
         <input class="form-check-input" type="checkbox" name="remember_me" id="remember-me" value="1">
         <label class="form-check-label" for="remember-me" style="font-size:13px;cursor:pointer">Remember me</label>
     </div>
-    <a href="forgot_password.php" style="font-size:13px;color:#667eea">Forgot password?</a>
+    <a href="forgot_password.php" style="font-size:13px;color:#667eea">Forgot password?</a></div>
+<div style="margin-top:6px;font-size:12px">
+    <a href="magic_link.php" style="color:#a78bfa">&#x2728; Login with magic link</a>
+    &nbsp;&bull;&nbsp;
+    <a href="ai_recovery.php" style="color:#c4b5fd">&#x1F916; AI account recovery</a>
+</div>
+<div style="display:none">
 </div>
 <button type="submit" class="btn btn-success mt-2" style="width:100%"> Sign In </button>
 </form>

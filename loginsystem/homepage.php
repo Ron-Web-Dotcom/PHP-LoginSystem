@@ -18,7 +18,9 @@ if ($_con) {
     }
     mysqli_close($_con);
 }
-$isAdmin = !empty($_SESSION['is_admin']);
+$isAdmin    = !empty($_SESSION['is_admin']);
+$newIpAlert = $_SESSION['new_ip_alert'] ?? null;
+if ($newIpAlert) unset($_SESSION['new_ip_alert']);
 ?>
 <html>
 <head>
@@ -30,6 +32,110 @@ $isAdmin = !empty($_SESSION['is_admin']);
     h1 { color:#fff !important; margin-top:70px !important; text-align:center; text-transform:uppercase; }
     .dash-links { text-align:center; margin-top:10px; flex-wrap:wrap; display:flex; justify-content:center; gap:4px 14px; }
     .dash-links a { font-size:13px; color:#a78bfa !important; }
+
+    /* ── New IP alert banner ── */
+    #new-ip-banner {
+        max-width:480px; margin:14px auto 0;
+        background:rgba(251,146,60,0.12); border:1px solid rgba(251,146,60,0.35);
+        border-radius:12px; padding:12px 16px;
+        color:#fdba74; font-size:13px; display:flex; align-items:center; gap:10px;
+    }
+    #new-ip-banner .niab-close {
+        margin-left:auto; background:none; border:none;
+        color:#fb923c; font-size:16px; cursor:pointer; line-height:1;
+    }
+
+    /* ── Notification bell ── */
+    #notif-bell {
+        position:fixed; top:18px; right:66px;
+        background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+        border-radius:50%; width:38px; height:38px; font-size:18px;
+        cursor:pointer; color:#fff; z-index:500;
+        display:flex; align-items:center; justify-content:center;
+        transition:background .2s; position:fixed;
+    }
+    #notif-bell:hover { background:rgba(255,255,255,0.2); }
+    #notif-badge {
+        position:absolute; top:-4px; right:-4px;
+        background:#ef4444; color:#fff; border-radius:50%;
+        width:16px; height:16px; font-size:10px; font-weight:700;
+        display:flex; align-items:center; justify-content:center;
+        display:none;
+    }
+    #notif-dropdown {
+        display:none; position:fixed; top:62px; right:66px;
+        width:300px; background:#1e1e2e; border-radius:14px;
+        box-shadow:0 8px 28px rgba(0,0,0,0.5); z-index:501;
+        border:1px solid rgba(255,255,255,0.08); overflow:hidden;
+    }
+    #notif-dropdown.open { display:block; }
+    .notif-header {
+        padding:10px 14px; background:linear-gradient(135deg,#667eea,#764ba2);
+        color:#fff; font-weight:600; font-size:13px;
+        display:flex; align-items:center; justify-content:space-between;
+    }
+    .notif-header button { background:none;border:none;color:#fff;font-size:11px;cursor:pointer; }
+    .notif-list { max-height:280px; overflow-y:auto; }
+    .notif-item {
+        padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.05);
+        font-size:12px; color:#d0d0d0; line-height:1.5;
+    }
+    .notif-item:last-child { border-bottom:none; }
+    .notif-item.unread { background:rgba(102,126,234,0.06); }
+    .notif-time { font-size:10px; color:#64748b; margin-top:2px; }
+    .notif-type-warning { border-left:3px solid #fb923c; }
+    .notif-type-danger  { border-left:3px solid #ef4444; }
+    .notif-type-success { border-left:3px solid #4ade80; }
+    .notif-type-info    { border-left:3px solid #60a5fa; }
+    .notif-empty { padding:16px; text-align:center; color:#64748b; font-size:12px; }
+
+    /* ── AI Anomaly card ── */
+    #anomaly-card {
+        max-width:480px; margin:14px auto 0;
+        background:rgba(139,92,246,0.07); border:1px solid rgba(139,92,246,0.2);
+        border-radius:14px; padding:18px 24px; color:#e0e0e0; backdrop-filter:blur(6px);
+    }
+    #anomaly-card .anom-label {
+        font-size:11px; font-weight:700; letter-spacing:1.5px;
+        text-transform:uppercase; color:#a78bfa; margin-bottom:10px;
+    }
+    .btn-anom {
+        background:rgba(139,92,246,0.2); border:1px solid rgba(139,92,246,0.35);
+        color:#c4b5fd; border-radius:8px; padding:6px 14px;
+        font-size:12px; cursor:pointer; transition:background .15s;
+    }
+    .btn-anom:hover { background:rgba(139,92,246,0.35); }
+    .anom-row {
+        display:flex; align-items:flex-start; gap:8px;
+        padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px;
+    }
+    .anom-row:last-child { border-bottom:none; }
+    .sev-high   { color:#f87171; }
+    .sev-medium { color:#fb923c; }
+    .sev-low    { color:#facc15; }
+
+    /* ── Keyboard shortcuts modal ── */
+    #kb-modal {
+        display:none; position:fixed; inset:0;
+        background:rgba(0,0,0,0.6); z-index:600;
+        align-items:center; justify-content:center;
+    }
+    #kb-modal.open { display:flex; }
+    #kb-box {
+        background:#1e1e2e; border-radius:16px; padding:24px 28px;
+        border:1px solid rgba(255,255,255,0.1); min-width:280px;
+        box-shadow:0 10px 40px rgba(0,0,0,0.6);
+    }
+    #kb-box h4 { color:#fff; font-size:14px; margin-bottom:14px; }
+    .kb-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; color:#d0d0d0; }
+    .kb-key {
+        background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+        border-radius:6px; padding:2px 8px; font-family:monospace; font-size:12px; color:#fff;
+        min-width:26px; text-align:center;
+    }
+
+    /* ── Geo tag in session log ── */
+    .log-geo { font-size:11px; color:#64748b; text-align:center; }
 
     /* ── Theme toggle ── */
     #theme-toggle {
@@ -247,18 +353,81 @@ $isAdmin = !empty($_SESSION['is_admin']);
 <!-- Theme toggle button -->
 <button id="theme-toggle" title="Toggle light/dark mode">&#x1F319;</button>
 
+<!-- Notification bell -->
+<div style="position:fixed;top:18px;right:66px;z-index:500">
+    <button id="notif-bell" title="Notifications">
+        &#x1F514;
+        <span id="notif-badge"></span>
+    </button>
+    <div id="notif-dropdown">
+        <div class="notif-header">
+            <span>&#x1F514; Notifications</span>
+            <button id="notif-mark-read" title="Mark all read">Mark all read</button>
+        </div>
+        <div class="notif-list" id="notif-list">
+            <div class="notif-empty">Loading…</div>
+        </div>
+    </div>
+</div>
+
+<!-- Keyboard shortcuts modal -->
+<div id="kb-modal">
+    <div id="kb-box">
+        <h4>&#x2328; Keyboard Shortcuts</h4>
+        <div class="kb-row"><span class="kb-key">p</span> Open Profile</div>
+        <div class="kb-row"><span class="kb-key">2</span> 2FA Setup</div>
+        <div class="kb-row"><span class="kb-key">k</span> Change Password</div>
+        <div class="kb-row"><span class="kb-key">a</span> Admin Panel <?php if (!$isAdmin): echo '(admin only)'; endif; ?></div>
+        <div class="kb-row"><span class="kb-key">s</span> Security Report</div>
+        <div class="kb-row"><span class="kb-key">l</span> Logout</div>
+        <div class="kb-row"><span class="kb-key">?</span> Toggle this help</div>
+        <div class="kb-row"><span class="kb-key">Esc</span> Close overlays</div>
+        <div style="text-align:center;margin-top:12px">
+            <button onclick="document.getElementById('kb-modal').classList.remove('open')"
+                    style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;padding:5px 16px;font-size:12px;cursor:pointer">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
 <a href="logout.php">LOGOUT</a>
 <h1>Welcome <?php echo htmlspecialchars($_SESSION['email']); ?></h1>
+
+<?php if ($newIpAlert): ?>
+<!-- New IP alert banner -->
+<div id="new-ip-banner">
+    <span>&#x26A0; Login detected from a new IP address. Previous logins were from <strong><?= htmlspecialchars($newIpAlert) ?></strong>. If this wasn't you, change your password immediately.</span>
+    <button class="niab-close" onclick="this.parentElement.remove()">&times;</button>
+</div>
+<?php endif; ?>
 
 <div class="dash-links">
     <a href="profile.php">&#x1F464; Profile</a>
     <a href="totp_setup.php">&#x1F510; 2FA Setup</a>
+    <a href="backup_codes.php">&#x1F5DD; Backup Codes</a>
     <a href="change_password.php">&#x1F511; Change Password</a>
+    <a href="session_manager.php">&#x1F5A5; Sessions</a>
+    <a href="audit_log.php">&#x1F4DC; Audit Log</a>
+    <a href="onboarding.php">&#x2705; Setup Checklist</a>
+    <a href="security_report.php">&#x1F4CB; Security Report</a>
     <a href="phishing.php">&#x1F3A3; Phishing Detector</a>
     <a href="export_log.php">&#x1F4E5; Export Log</a>
     <?php if ($isAdmin): ?>
     <a href="admin.php" style="color:#f97316 !important">&#x1F6E1; Admin</a>
     <?php endif; ?>
+</div>
+
+<!-- AI Anomaly Detector (on-demand) -->
+<div id="anomaly-card">
+    <div class="anom-label">&#x1F9EC; AI Anomaly Detector</div>
+    <p style="font-size:12px;color:#64748b;margin-bottom:10px">
+        Analyse your login patterns for unusual behaviour.
+    </p>
+    <button class="btn-anom" id="anom-btn" onclick="runAnomalyCheck()">
+        &#x1F50D; Analyse My Login Patterns
+    </button>
+    <div id="anom-result" style="margin-top:12px"></div>
 </div>
 
 <!-- ── AI Security Score Card ── -->
@@ -330,6 +499,138 @@ $isAdmin = !empty($_SESSION['is_admin']);
 </div>
 
 <script>
+/* ── 0a. Notification bell ── */
+(function () {
+    const bell     = document.getElementById('notif-bell');
+    const dropdown = document.getElementById('notif-dropdown');
+    const badge    = document.getElementById('notif-badge');
+    const list     = document.getElementById('notif-list');
+    const markRead = document.getElementById('notif-mark-read');
+    const typeIcon = {warning:'⚠️',danger:'🔴',success:'✅',info:'ℹ️'};
+
+    async function load() {
+        try {
+            const r = await fetch('get_notifications.php');
+            const d = await r.json();
+            if (d.unread > 0) {
+                badge.textContent = d.unread > 9 ? '9+' : d.unread;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+            if (!d.notifications || !d.notifications.length) {
+                list.innerHTML = '<div class="notif-empty">No notifications</div>';
+                return;
+            }
+            list.innerHTML = d.notifications.map(n =>
+                `<div class="notif-item ${n.is_read ? '' : 'unread'} notif-type-${n.type}">
+                    <div>${typeIcon[n.type] || '•'} ${escHtmlNotif(n.message)}</div>
+                    <div class="notif-time">${escHtmlNotif(n.time_ago)}</div>
+                </div>`
+            ).join('');
+        } catch (e) {}
+    }
+
+    function escHtmlNotif(s) {
+        const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML;
+    }
+
+    bell.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+        if (dropdown.classList.contains('open')) load();
+    });
+
+    markRead.addEventListener('click', async function () {
+        await fetch('mark_notifications_read.php', { method:'POST' });
+        badge.style.display = 'none';
+        list.querySelectorAll('.notif-item').forEach(i => i.classList.remove('unread'));
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!dropdown.contains(e.target) && e.target !== bell) {
+            dropdown.classList.remove('open');
+        }
+    });
+
+    load();   // initial badge count
+})();
+
+/* ── 0b. Keyboard shortcuts ── */
+(function () {
+    const isAdmin = <?= $isAdmin ? 'true' : 'false' ?>;
+    document.addEventListener('keydown', function (e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        const kbModal = document.getElementById('kb-modal');
+        switch (e.key) {
+            case '?': kbModal.classList.toggle('open'); break;
+            case 'Escape':
+                kbModal.classList.remove('open');
+                document.getElementById('notif-dropdown').classList.remove('open');
+                const cw = document.getElementById('chat-window');
+                if (cw) cw.classList.remove('open');
+                break;
+            case 'p': window.location = 'profile.php';        break;
+            case '2': window.location = 'totp_setup.php';     break;
+            case 'k': window.location = 'change_password.php'; break;
+            case 's': window.location = 'security_report.php'; break;
+            case 'l': window.location = 'logout.php';          break;
+            case 'a': if (isAdmin) window.location = 'admin.php'; break;
+        }
+    });
+})();
+
+/* ── 0c. AI Anomaly Detector ── */
+async function runAnomalyCheck() {
+    const btn = document.getElementById('anom-btn');
+    const res = document.getElementById('anom-result');
+    btn.disabled = true;
+    btn.textContent = 'Analysing…';
+    res.innerHTML = '';
+    function esc(s) { const d=document.createElement('div');d.textContent=String(s);return d.innerHTML; }
+    try {
+        const r = await fetch('ai_anomaly.php', { method:'POST' });
+        const d = await r.json();
+        if (d.error) { res.textContent = d.error; return; }
+        let html = `<div style="font-size:12px;color:#94a3b8;margin-bottom:8px">${esc(d.summary || '')}</div>`;
+        if (d.anomalies && d.anomalies.length) {
+            d.anomalies.forEach(a => {
+                const cls = a.severity === 'high' ? 'sev-high' : a.severity === 'medium' ? 'sev-medium' : 'sev-low';
+                html += `<div class="anom-row">
+                    <span class="${cls}" style="font-weight:700;flex-shrink:0">[${esc((a.severity||'').toUpperCase())}]</span>
+                    <span>${esc(a.description)}</span>
+                </div>`;
+            });
+        } else {
+            html += '<div style="color:#4ade80;font-size:12px">✅ No anomalies detected — your login patterns look normal.</div>';
+        }
+        res.innerHTML = html;
+    } catch (e) {
+        res.textContent = 'Network error.';
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = '🔍 Re-analyse';
+    }
+}
+
+/* ── 0d. Geolocation on session log IPs ── */
+(function () {
+    document.querySelectorAll('.log-ip').forEach(async cell => {
+        const ip = cell.textContent.trim();
+        if (!ip || ip.startsWith('127.') || ip.startsWith('::') || ip === '0.0.0.0') return;
+        try {
+            const r = await fetch('get_geo.php?ip=' + encodeURIComponent(ip));
+            const d = await r.json();
+            if (d.flag || d.city) {
+                const tag = document.createElement('div');
+                tag.className = 'log-geo';
+                tag.textContent = [d.flag, d.city, d.country].filter(Boolean).join(' ');
+                cell.parentNode.insertBefore(tag, cell.nextSibling);
+            }
+        } catch (e) {}
+    });
+})();
+
 /* ── 0. Theme toggle ── */
 (function () {
     const btn  = document.getElementById('theme-toggle');

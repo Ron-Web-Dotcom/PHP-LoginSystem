@@ -181,9 +181,15 @@ $displayName = explode('@', $email)[0];
             <?php echo $totpEnabled ? '&#x2705; On' : 'Off'; ?>
         </span>
     </div>
-    <a href="totp_setup.php"  class="link-btn">&#x1F510; <?php echo $totpEnabled ? 'Manage' : 'Enable'; ?> Two-Factor Authentication</a>
-    <a href="change_password.php" class="link-btn">&#x1F511; Change Password</a>
-    <a href="export_log.php"  class="link-btn">&#x1F4E5; Export Login History (CSV)</a>
+    <a href="totp_setup.php"       class="link-btn">&#x1F510; <?php echo $totpEnabled ? 'Manage' : 'Enable'; ?> Two-Factor Authentication</a>
+    <a href="backup_codes.php"     class="link-btn">&#x1F5DD; 2FA Backup Codes</a>
+    <a href="change_password.php"  class="link-btn">&#x1F511; Change Password</a>
+    <a href="session_manager.php"  class="link-btn">&#x1F5A5; Active Sessions</a>
+    <a href="audit_log.php"        class="link-btn">&#x1F4DC; Account Audit Log</a>
+    <a href="security_report.php"  class="link-btn">&#x1F4CB; AI Security Report</a>
+    <a href="onboarding.php"       class="link-btn">&#x2705; Security Setup Checklist</a>
+    <a href="export_log.php"       class="link-btn">&#x1F4E5; Export Login History (CSV)</a>
+    <a href="delete_account.php"   class="link-btn" style="color:#fca5a5 !important">&#x1F5D1; Delete Account</a>
 
     <!-- Recent logins -->
     <?php if (!empty($recentLogins)): ?>
@@ -205,5 +211,24 @@ $displayName = explode('@', $email)[0];
 
     <div class="back-link"><a href="homepage.php">&larr; Back to Dashboard</a></div>
 </div>
+<script>
+/* Geolocation for recent login IPs */
+(function () {
+    document.querySelectorAll('.lmt-ip').forEach(async cell => {
+        const ip = cell.textContent.trim();
+        if (!ip || ip.startsWith('127.') || ip.startsWith('::') || ip === '0.0.0.0') return;
+        try {
+            const r = await fetch('get_geo.php?ip=' + encodeURIComponent(ip));
+            const d = await r.json();
+            if (d.flag || d.city) {
+                const tag = document.createElement('div');
+                tag.style.cssText = 'font-size:10px;color:#64748b;margin-top:1px';
+                tag.textContent = [d.flag, d.city, d.country].filter(Boolean).join(' ');
+                cell.appendChild(tag);
+            }
+        } catch (e) {}
+    });
+})();
+</script>
 </body>
 </html>

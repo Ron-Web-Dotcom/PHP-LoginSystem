@@ -52,19 +52,41 @@ function _auth_try_remember_cookie(): void
     $found = mysqli_stmt_fetch($stmt);
     mysqli_stmt_close($stmt);
 
-    // Also pull is_admin so the session is complete
+    // Check IP blocklist before restoring session from cookie
+    $currentIp = $_SERVER['REMOTE_ADDR'] ?? '';
+    $tblBl = mysqli_query($con, "SHOW TABLES LIKE 'tbl_ip_blocklist'");
+    if ($tblBl && mysqli_num_rows($tblBl) > 0) {
+        $blSt = mysqli_prepare($con, "SELECT 1 FROM tbl_ip_blocklist WHERE ip = ?");
+        if ($blSt) {
+            mysqli_stmt_bind_param($blSt, 's', $currentIp);
+            mysqli_stmt_execute($blSt);
+            mysqli_stmt_store_result($blSt);
+            $ipIsBlocked = mysqli_stmt_num_rows($blSt) > 0;
+            mysqli_stmt_close($blSt);
+            if ($ipIsBlocked) {
+                mysqli_close($con);
+                session_destroy();
+                header('location:login.php');
+                exit();
+            }
+        }
+    }
+
+    // Pull is_admin and role so the session is complete
     $isAdmin = 0;
+    $role    = 'user';
     if ($found) {
-        $s2 = mysqli_prepare($con, "SELECT is_admin FROM tbl_signup WHERE email = ?");
+        $s2 = mysqli_prepare($con, "SELECT is_admin, role FROM tbl_signup WHERE email = ?");
         if ($s2) {
             mysqli_stmt_bind_param($s2, 's', $foundEmail);
             mysqli_stmt_execute($s2);
-            mysqli_stmt_bind_result($s2, $isAdmin);
+            mysqli_stmt_bind_result($s2, $isAdmin, $role);
             mysqli_stmt_fetch($s2);
             mysqli_stmt_close($s2);
         }
         $_SESSION['email']    = $foundEmail;
         $_SESSION['is_admin'] = (int) $isAdmin;
+        $_SESSION['role']     = $role ?? 'user';
         // Slide the cookie expiry window
         setcookie(
             'remember_token',

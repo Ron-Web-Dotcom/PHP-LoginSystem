@@ -30,13 +30,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_stmt_close($stmt);
 
         if (password_verify($currentPass, $storedHash)) {
-            $newHash = password_hash($newPass, PASSWORD_DEFAULT);
-            $stmt2   = mysqli_prepare($con, 'UPDATE tbl_signup SET password = ? WHERE email = ?');
-            mysqli_stmt_bind_param($stmt2, 'ss', $newHash, $_SESSION['email']);
-            mysqli_stmt_execute($stmt2);
-            mysqli_stmt_close($stmt2);
-            $message = 'Password updated successfully!';
-            $msgType = 'success';
+            // Password history check (last 5 passwords)
+            $historyBlock = false;
+            $tblPh = mysqli_query($con, "SHOW TABLES LIKE 'tbl_password_history'");
+            if ($tblPh && mysqli_num_rows($tblPh) > 0) {
+                $phStmt = mysqli_prepare($con,
+                    "SELECT password_hash FROM tbl_password_history
+                     WHERE email = ? ORDER BY changed_at DESC LIMIT 5"
+                );
+                mysqli_stmt_bind_param($phStmt, 's', $_SESSION['email']);
+                mysqli_stmt_execute($phStmt);
+                $phRes = mysqli_stmt_get_result($phStmt);
+                while ($phRow = mysqli_fetch_assoc($phRes)) {
+                    if (password_verify($newPass, $phRow['password_hash'])) {
+                        $historyBlock = true;
+                        break;
+                    }
+                }
+                mysqli_stmt_close($phStmt);
+            }
+
+            if ($historyBlock) {
+                $message = 'You cannot reuse one of your last 5 passwords. Please choose a new one.';
+                $msgType = 'danger';
+            } else {
+                $newHash = password_hash($newPass, PASSWORD_DEFAULT);
+                $stmt2   = mysqli_prepare($con, 'UPDATE tbl_signup SET password = ? WHERE email = ?');
+                mysqli_stmt_bind_param($stmt2, 'ss', $newHash, $_SESSION['email']);
+                mysqli_stmt_execute($stmt2);
+                mysqli_stmt_close($stmt2);
+
+                // Save to password history
+                if ($tblPh && mysqli_num_rows($tblPh) > 0) {
+                    $now    = date('Y-m-d H:i:s');
+                    $phIns  = mysqli_prepare($con,
+                        "INSERT INTO tbl_password_history (email, password_hash, changed_at) VALUES (?,?,?)"
+                    );
+                    mysqli_stmt_bind_param($phIns, 'sss', $_SESSION['email'], $newHash, $now);
+                    mysqli_stmt_execute($phIns);
+                    mysqli_stmt_close($phIns);
+                }
+
+                // Audit log
+                $tblAl = mysqli_query($con, "SHOW TABLES LIKE 'tbl_audit_log'");
+                if ($tblAl && mysqli_num_rows($tblAl) > 0) {
+                    $now = $now ?? date('Y-m-d H:i:s');
+                    $ip  = $_SERVER['REMOTE_ADDR'] ?? '';
+                    $ev  = 'password_changed';
+                    $dt  = 'Password changed by user';
+                    $alS = mysqli_prepare($con,
+                        "INSERT INTO tbl_audit_log (email, event, detail, ip, created_at) VALUES (?,?,?,?,?)"
+                    );
+                    mysqli_stmt_bind_param($alS, 'sssss', $_SESSION['email'], $ev, $dt, $ip, $now);
+                    mysqli_stmt_execute($alS);
+                    mysqli_stmt_close($alS);
+                }
+
+                $message = 'Password updated successfully!';
+                $msgType = 'success';
+            }
         } else {
             $message = 'Current password is incorrect.';
             $msgType = 'danger';
@@ -158,6 +210,38 @@ $user = htmlspecialchars(explode('@', $_SESSION['email'])[0]);
     } catch (e) {
         el.textContent = 'Use a long passphrase mixing words, numbers, and symbols.';
     }
+})();
+
+/* HIBP breach check (non-blocking warning) */
+(function () {
+    const pwIn   = document.getElementById('cp-new-pw');
+    let hibpTimer = null;
+    const hibpWarn = document.createElement('div');
+    hibpWarn.style.cssText = 'font-size:12px;margin-top:4px;min-height:16px;';
+    pwIn.parentNode.insertBefore(hibpWarn, pwIn.nextSibling);
+
+    pwIn.addEventListener('input', function () {
+        clearTimeout(hibpTimer);
+        hibpWarn.textContent = '';
+        const val = this.value;
+        if (val.length < 8) return;
+        hibpTimer = setTimeout(async () => {
+            try {
+                const r = await fetch('check_hibp.php', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: val })
+                });
+                const d = await r.json();
+                if (d.breached) {
+                    hibpWarn.innerHTML = '&#x26A0; This password appeared in <strong>' + d.count.toLocaleString() + '</strong> data breaches. Choose a different one.';
+                    hibpWarn.style.color = '#f97316';
+                } else if (!d.error) {
+                    hibpWarn.textContent = '&#x2705; Not found in known breaches.';
+                    hibpWarn.style.color = '#4ade80';
+                }
+            } catch (e) { /* silent */ }
+        }, 900);
+    });
 })();
 
 /* New password strength */

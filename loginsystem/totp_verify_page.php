@@ -12,28 +12,84 @@ require_once 'totp.php';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $code  = preg_replace('/\D/', '', $_POST['code'] ?? '');
-    $email = $_SESSION['totp_pending'];
+    $email     = $_SESSION['totp_pending'];
+    $useBackup = !empty($_POST['use_backup']);
+    $con       = mysqli_connect('localhost', 'root', '', 'system');
+    $verified  = false;
 
-    $con  = mysqli_connect('localhost', 'root', '', 'system');
-    $stmt = mysqli_prepare($con, "SELECT totp_secret FROM tbl_signup WHERE email = ?");
-    mysqli_stmt_bind_param($stmt, 's', $email);
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_bind_result($stmt, $secret);
-    mysqli_stmt_fetch($stmt);
-    mysqli_stmt_close($stmt);
-    mysqli_close($con);
+    if ($useBackup) {
+        // Backup code path
+        $rawCode   = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $_POST['backup_code'] ?? ''));
+        $codeHash  = hash('sha256', $rawCode);
+        $now       = date('Y-m-d H:i:s');
 
-    if ($secret && totp_verify($secret, $code)) {
+        $tbl = mysqli_query($con, "SHOW TABLES LIKE 'tbl_backup_codes'");
+        if ($tbl && mysqli_num_rows($tbl) > 0) {
+            $bcs = mysqli_prepare($con,
+                "SELECT id FROM tbl_backup_codes
+                 WHERE email = ? AND code_hash = ? AND used_at IS NULL LIMIT 1"
+            );
+            mysqli_stmt_bind_param($bcs, 'ss', $email, $codeHash);
+            mysqli_stmt_execute($bcs);
+            mysqli_stmt_bind_result($bcs, $bcId);
+            $bcFound = mysqli_stmt_fetch($bcs);
+            mysqli_stmt_close($bcs);
+
+            if ($bcFound) {
+                // Mark as used
+                $bcu = mysqli_prepare($con, "UPDATE tbl_backup_codes SET used_at = ? WHERE id = ?");
+                mysqli_stmt_bind_param($bcu, 'si', $now, $bcId);
+                mysqli_stmt_execute($bcu);
+                mysqli_stmt_close($bcu);
+                $verified = true;
+
+                // Audit
+                $tblAl = mysqli_query($con, "SHOW TABLES LIKE 'tbl_audit_log'");
+                if ($tblAl && mysqli_num_rows($tblAl) > 0) {
+                    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+                    $ev = 'backup_code_used'; $dt = 'Backup code used for login';
+                    $als = mysqli_prepare($con,
+                        "INSERT INTO tbl_audit_log (email,event,detail,ip,created_at) VALUES (?,?,?,?,?)"
+                    );
+                    mysqli_stmt_bind_param($als,'sssss',$email,$ev,$dt,$ip,$now);
+                    mysqli_stmt_execute($als);
+                    mysqli_stmt_close($als);
+                }
+            } else {
+                $error = 'Invalid or already-used backup code.';
+            }
+        } else {
+            $error = 'Backup codes not available.';
+        }
+    } else {
+        // Standard TOTP path
+        $code = preg_replace('/\D/', '', $_POST['code'] ?? '');
+        $stmt = mysqli_prepare($con, "SELECT totp_secret FROM tbl_signup WHERE email = ?");
+        mysqli_stmt_bind_param($stmt, 's', $email);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_bind_result($stmt, $secret);
+        mysqli_stmt_fetch($stmt);
+        mysqli_stmt_close($stmt);
+
+        if ($secret && totp_verify($secret, $code)) {
+            $verified = true;
+        } else {
+            $error = 'Invalid or expired code — please try again.';
+        }
+    }
+
+    if ($verified) {
         $isAdmin = $_SESSION['is_admin_pending'] ?? 0;
-        unset($_SESSION['totp_pending'], $_SESSION['is_admin_pending']);
+        $role    = $_SESSION['role_pending']     ?? 'user';
+        unset($_SESSION['totp_pending'], $_SESSION['is_admin_pending'], $_SESSION['role_pending']);
         $_SESSION['email']    = $email;
         $_SESSION['is_admin'] = (int) $isAdmin;
+        $_SESSION['role']     = $role;
+        mysqli_close($con);
         header('location:homepage.php');
         exit();
-    } else {
-        $error = 'Invalid or expired code — please try again.';
     }
+    mysqli_close($con);
 }
 ?>
 <!DOCTYPE html>
@@ -107,6 +163,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="countdown" id="countdown"></div>
         <button type="submit" class="btn-verify">Verify</button>
     </form>
+
+    <!-- Backup code form (hidden by default) -->
+    <form method="post" id="backup-form" style="display:none;margin-top:16px">
+        <input type="hidden" name="use_backup" value="1">
+        <input type="text" name="backup_code"
+               class="code-input" placeholder="XXXX-XXXX-XXXX"
+               maxlength="14" autocomplete="off" spellcheck="false">
+        <button type="submit" class="btn-verify" style="margin-top:12px">
+            Use Backup Code
+        </button>
+    </form>
+    <div style="text-align:center;margin-top:10px">
+        <button id="toggle-backup" onclick="
+            const f=document.getElementById('backup-form');
+            const tf=document.querySelector('form:not(#backup-form)');
+            const showing=f.style.display!=='none';
+            f.style.display=showing?'none':'block';
+            tf.style.display=showing?'block':'none';
+            this.textContent=showing?'Use backup code instead':'Use authenticator code';
+        " style="background:none;border:none;color:#a78bfa;font-size:12px;cursor:pointer">
+            Use backup code instead
+        </button>
+    </div>
 
     <div class="back-link">
         <a href="login.php">&#x2190; Back to Login</a>
