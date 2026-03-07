@@ -1,10 +1,5 @@
 <?php
-session_start();
-
-if (!isset($_SESSION['email'])) {
-    header('location:login.php');
-    exit();
-}
+require_once 'auth_check.php';
 
 $message = '';
 $msgType = '';

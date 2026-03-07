@@ -52,7 +52,7 @@ if ($newIpAlert) unset($_SESSION['new_ip_alert']);
         border-radius:50%; width:38px; height:38px; font-size:18px;
         cursor:pointer; color:#fff; z-index:500;
         display:flex; align-items:center; justify-content:center;
-        transition:background .2s; position:fixed;
+        transition:background .2s;
     }
     #notif-bell:hover { background:rgba(255,255,255,0.2); }
     #notif-badge {

@@ -8,8 +8,13 @@ $dbname = "system";
 
 $con = mysqli_connect($host, $user, $password, $dbname);
 
-$name = $_POST['email'];
-$pass = $_POST['password'];
+if (!$con) {
+    echo "<p style='color:red;'>Database connection failed. Please try again later.</p>";
+    exit();
+}
+
+$name = $_POST['email'] ?? '';
+$pass = $_POST['password'] ?? '';
 
 // Check if email already exists
 $stmt = mysqli_prepare($con, "SELECT email FROM tbl_signup WHERE email = ?");

@@ -40,6 +40,29 @@ if (!empty($result['content'][0]['text'])) {
     $farewell = htmlspecialchars(trim($result['content'][0]['text']));
 }
 
+// ── Invalidate remember-me token before destroying the session ────────────────
+if (!empty($_COOKIE['remember_token'])) {
+    $sep = strpos($_COOKIE['remember_token'], ':');
+    if ($sep !== false) {
+        $rawToken  = substr($_COOKIE['remember_token'], $sep + 1);
+        $tokenHash = hash('sha256', $rawToken);
+        $logoutCon = mysqli_connect('localhost', 'root', '', 'system');
+        if ($logoutCon) {
+            $tblRt = mysqli_query($logoutCon, "SHOW TABLES LIKE 'tbl_remember_tokens'");
+            if ($tblRt && mysqli_num_rows($tblRt) > 0) {
+                $delRt = mysqli_prepare($logoutCon, "DELETE FROM tbl_remember_tokens WHERE token_hash = ?");
+                if ($delRt) {
+                    mysqli_stmt_bind_param($delRt, 's', $tokenHash);
+                    mysqli_stmt_execute($delRt);
+                    mysqli_stmt_close($delRt);
+                }
+            }
+            mysqli_close($logoutCon);
+        }
+    }
+    setcookie('remember_token', '', time() - 3600, '/', '', false, true);
+}
+
 session_destroy();
 ?>
 <!DOCTYPE html>

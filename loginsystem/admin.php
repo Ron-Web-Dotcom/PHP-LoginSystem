@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_stmt_bind_param($del, 's', $ue);
         mysqli_stmt_execute($del);
         mysqli_stmt_close($del);
-        $msg = htmlspecialchars($ue) . ' unlocked.';
+        $msg = $ue . ' unlocked.';
     }
 
     // Block IP
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_stmt_bind_param($aps, 's', $au);
         mysqli_stmt_execute($aps);
         mysqli_stmt_close($aps);
-        $msg = htmlspecialchars($au) . ' approved.';
+        $msg = $au . ' approved.';
     }
 
     // Reject user
@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_stmt_bind_param($rjs, 's', $ru);
         mysqli_stmt_execute($rjs);
         mysqli_stmt_close($rjs);
-        $msg = htmlspecialchars($ru) . ' rejected.';
+        $msg = $ru . ' rejected.';
     }
 
     // Change role
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_stmt_bind_param($rs, 'sis', $nr, $newIsAdmin, $re);
         mysqli_stmt_execute($rs);
         mysqli_stmt_close($rs);
-        $msg = "Role of " . htmlspecialchars($re) . " changed to {$nr}.";
+        $msg = "Role of {$re} changed to {$nr}.";
     }
 }
 
@@ -279,7 +279,7 @@ $currentUserEmail = $_SESSION['email'];
 <div class="admin-wrap">
     <?php if ($msg): ?>
     <div class="alert alert-<?= $msgType ?> py-2 mb-3" style="font-size:13px">
-        <?= $msgType === 'success' ? '&#x2705; ' : '&#x26A0; ' ?><?= $msg ?>
+        <?= $msgType === 'success' ? '&#x2705; ' : '&#x26A0; ' ?><?= htmlspecialchars($msg) ?>
     </div>
     <?php endif; ?>
 

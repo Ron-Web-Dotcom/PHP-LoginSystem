@@ -50,7 +50,7 @@ $tbl2 = mysqli_query($con, "SHOW TABLES LIKE 'tbl_remember_tokens'");
 if ($tbl2 && mysqli_num_rows($tbl2) > 0) {
     $now  = date('Y-m-d H:i:s');
     $stmt = mysqli_prepare($con,
-        "SELECT id, created_at, expires_at FROM tbl_remember_tokens
+        "SELECT id, token_hash, created_at, expires_at FROM tbl_remember_tokens
          WHERE email = ? AND expires_at > ?
          ORDER BY created_at DESC"
     );
