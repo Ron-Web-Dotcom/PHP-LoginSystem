@@ -148,6 +148,30 @@ if ($rtcc && mysqli_num_rows($rtcc) === 0) {
     );
 }
 
+// Bootstrap tbl_email_verifications
+mysqli_query($con,
+    "CREATE TABLE IF NOT EXISTS tbl_email_verifications (
+        id         INT          AUTO_INCREMENT PRIMARY KEY,
+        email      VARCHAR(255) NOT NULL,
+        token_hash VARCHAR(64)  NOT NULL,
+        expires_at DATETIME     NOT NULL,
+        used       TINYINT(1)   NOT NULL DEFAULT 0,
+        created_at DATETIME     NOT NULL,
+        INDEX idx_token (token_hash)
+    )"
+);
+
+// Bootstrap email_verified column on tbl_signup.
+// When first added, all EXISTING rows are marked verified=1 (they predate this feature).
+$evCheck = mysqli_query($con,
+    "SELECT 1 FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA='{$dbname}' AND TABLE_NAME='tbl_signup' AND COLUMN_NAME='email_verified'"
+);
+if ($evCheck && mysqli_num_rows($evCheck) === 0) {
+    mysqli_query($con, "ALTER TABLE tbl_signup ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0");
+    mysqli_query($con, "UPDATE tbl_signup SET email_verified = 1");
+}
+
 // ── Inputs ────────────────────────────────────────────────────────────────────
 $email      = $_POST['email']    ?? '';
 $password   = $_POST['password'] ?? '';
@@ -190,22 +214,23 @@ if ($failCount >= 5) {
 
 // ── Authenticate ──────────────────────────────────────────────────────────────
 $stmt = mysqli_prepare($con,
-    "SELECT password, totp_enabled, totp_secret, is_admin, status, role FROM tbl_signup WHERE email = ?"
+    "SELECT password, totp_enabled, totp_secret, is_admin, status, role, COALESCE(email_verified,1) FROM tbl_signup WHERE email = ?"
 );
 mysqli_stmt_bind_param($stmt, 's', $email);
 mysqli_stmt_execute($stmt);
 mysqli_stmt_store_result($stmt);
 $num = mysqli_stmt_num_rows($stmt);
 
-$storedHash  = null;
-$totpEnabled = 0;
-$totpSecret  = null;
-$isAdmin     = 0;
-$status      = 'active';
-$role        = 'user';
+$storedHash    = null;
+$totpEnabled   = 0;
+$totpSecret    = null;
+$isAdmin       = 0;
+$status        = 'active';
+$role          = 'user';
+$emailVerified = 1;
 
 if ($num === 1) {
-    mysqli_stmt_bind_result($stmt, $storedHash, $totpEnabled, $totpSecret, $isAdmin, $status, $role);
+    mysqli_stmt_bind_result($stmt, $storedHash, $totpEnabled, $totpSecret, $isAdmin, $status, $role, $emailVerified);
     mysqli_stmt_fetch($stmt);
 }
 mysqli_stmt_close($stmt);
@@ -220,6 +245,14 @@ if ($num === 1 && $status !== 'active') {
 }
 
 if ($num === 1 && password_verify($password, $storedHash)) {
+
+    // ── Email verification gate ───────────────────────────────────────────────
+    if (!$emailVerified) {
+        mysqli_close($con);
+        $_SESSION['needs_verification'] = $email;
+        header('location:login.php');
+        exit();
+    }
 
     // Clear failure records
     $d = mysqli_prepare($con, "DELETE FROM tbl_login_attempts WHERE email = ?");

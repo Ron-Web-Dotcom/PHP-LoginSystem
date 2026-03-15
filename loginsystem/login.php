@@ -12,11 +12,17 @@ if (isset($_SESSION['email'])) {
     exit();
 }
 
-$loginFailed   = false;
-$lockedOut     = false;
-$ipBlocked     = false;
-$accountStatus = '';
-$deleted       = !empty($_GET['deleted']);
+$loginFailed        = false;
+$lockedOut          = false;
+$ipBlocked          = false;
+$accountStatus      = '';
+$deleted            = !empty($_GET['deleted']);
+$needsVerification  = '';
+
+if (!empty($_SESSION['needs_verification'])) {
+    $needsVerification = $_SESSION['needs_verification'];
+    unset($_SESSION['needs_verification']);
+}
 
 if (!empty($_SESSION['lockout'])) {
     $lockedOut   = true;
@@ -150,6 +156,19 @@ if (!empty($_SESSION['login_failed'])) {
 <?php if ($deleted): ?>
 <div class="alert alert-success py-2 mb-3" style="font-size:13px;border-radius:10px">
     &#x2705; Your account has been permanently deleted. Sorry to see you go.
+</div>
+<?php endif; ?>
+
+<?php if ($needsVerification): ?>
+<!-- ── Email Verification Required Banner ── -->
+<div class="alert alert-warning py-2 mb-3" style="font-size:13px;border-radius:10px">
+    <strong>&#x2709; Email verification required.</strong>
+    Please check your inbox and click the verification link before signing in.
+    <div style="margin-top:8px">
+        <a href="resend_verification.php" style="color:#856404;font-weight:600;font-size:12px">
+            &#x1F504; Resend verification email &rarr;
+        </a>
+    </div>
 </div>
 <?php endif; ?>
 

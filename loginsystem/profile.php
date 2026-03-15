@@ -13,15 +13,19 @@ if ($r && mysqli_num_rows($r) === 0) {
     mysqli_query($con, "ALTER TABLE tbl_signup ADD COLUMN totp_enabled TINYINT(1) DEFAULT 0");
 }
 
-// Fetch 2FA status
-$totpEnabled = false;
-$stmt = mysqli_prepare($con, "SELECT totp_enabled FROM tbl_signup WHERE email = ?");
+// Fetch 2FA status and email verification status
+$totpEnabled   = false;
+$emailVerified = true;
+$stmt = mysqli_prepare($con,
+    "SELECT totp_enabled, COALESCE(email_verified, 1) FROM tbl_signup WHERE email = ?"
+);
 mysqli_stmt_bind_param($stmt, 's', $email);
 mysqli_stmt_execute($stmt);
-mysqli_stmt_bind_result($stmt, $te);
+mysqli_stmt_bind_result($stmt, $te, $ev);
 mysqli_stmt_fetch($stmt);
 mysqli_stmt_close($stmt);
-$totpEnabled = (bool) $te;
+$totpEnabled   = (bool) $te;
+$emailVerified = (bool) $ev;
 
 // Session stats
 $totalSessions = 0;
@@ -175,6 +179,18 @@ $displayName = explode('@', $email)[0];
 
     <!-- Security -->
     <div class="section-label">Security</div>
+
+    <!-- Email verification status -->
+    <div style="margin-bottom:6px;font-size:13px">
+        Email Verified:
+        <span class="badge-2fa <?php echo $emailVerified ? 'badge-on' : 'badge-off'; ?>">
+            <?php echo $emailVerified ? '&#x2705; Verified' : '&#x26A0; Unverified'; ?>
+        </span>
+        <?php if (!$emailVerified): ?>
+        &nbsp;<a href="resend_verification.php" style="font-size:11px;color:#f97316">Resend link &rarr;</a>
+        <?php endif; ?>
+    </div>
+
     <div style="margin-bottom:6px;font-size:13px">
         Two-Factor Authentication:
         <span class="badge-2fa <?php echo $totpEnabled ? 'badge-on' : 'badge-off'; ?>">
@@ -189,6 +205,7 @@ $displayName = explode('@', $email)[0];
     <a href="security_report.php"  class="link-btn">&#x1F4CB; AI Security Report</a>
     <a href="onboarding.php"       class="link-btn">&#x2705; Security Setup Checklist</a>
     <a href="export_log.php"       class="link-btn">&#x1F4E5; Export Login History (CSV)</a>
+    <a href="data_export.php"      class="link-btn">&#x1F4BE; Download All My Data (JSON)</a>
     <a href="delete_account.php"   class="link-btn" style="color:#fca5a5 !important">&#x1F5D1; Delete Account</a>
 
     <!-- Recent logins -->

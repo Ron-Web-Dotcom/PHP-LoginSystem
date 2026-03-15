@@ -31,7 +31,8 @@ CREATE TABLE `tbl_signup` (
   `is_admin`     TINYINT(1)   NOT NULL    DEFAULT 0,
   `status`       VARCHAR(10)  NOT NULL    DEFAULT 'active',
   `role`         VARCHAR(20)  NOT NULL    DEFAULT 'user',
-  `onboarded`    TINYINT(1)   NOT NULL    DEFAULT 0,
+  `onboarded`      TINYINT(1)   NOT NULL    DEFAULT 0,
+  `email_verified` TINYINT(1)   NOT NULL    DEFAULT 0,
   PRIMARY KEY (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -172,6 +173,21 @@ CREATE TABLE `tbl_notifications` (
   `created_at` DATETIME     NOT NULL,
   PRIMARY KEY (`id`),
   INDEX `idx_email_read` (`email`, `is_read`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Table: tbl_email_verifications  (email address confirmation tokens)
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `tbl_email_verifications`;
+CREATE TABLE `tbl_email_verifications` (
+  `id`         INT          NOT NULL AUTO_INCREMENT,
+  `email`      VARCHAR(255) NOT NULL,
+  `token_hash` VARCHAR(64)  NOT NULL,
+  `expires_at` DATETIME     NOT NULL,
+  `used`       TINYINT(1)   NOT NULL DEFAULT 0,
+  `created_at` DATETIME     NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `idx_token` (`token_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 COMMIT;
