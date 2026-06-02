@@ -1,4 +1,17 @@
 <?php
+/**
+ * Login authentication handler.
+ *
+ * Flow:
+ *   1. Idempotent schema bootstrap (CREATE TABLE IF NOT EXISTS + ALTER TABLE migrations)
+ *   2. IP blocklist check — blocked IPs are rejected before any credential check
+ *   3. Brute-force lockout — 5+ failures within 15 minutes locks the account
+ *   4. Credential verification via password_verify() (bcrypt)
+ *   5. Email verification gate — unverified accounts are redirected with a resend prompt
+ *   6. New-IP detection — generates an in-app warning and audit event
+ *   7. Remember Me — generates a 30-day token (raw stored in cookie, SHA-256 hash in DB)
+ *   8. 2FA branch — if TOTP is enabled, stores credentials in session and routes to TOTP page
+ */
 session_start();
 
 $host   = "localhost";

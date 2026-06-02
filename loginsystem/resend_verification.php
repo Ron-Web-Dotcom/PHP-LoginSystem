@@ -1,4 +1,16 @@
 <?php
+/**
+ * Resend email verification link.
+ *
+ * Accepts POST with a single 'email' field.
+ * Intentionally returns the same success message whether or not the address is
+ * registered — this prevents email enumeration attacks.
+ *
+ * When the email IS registered and unverified:
+ *   - Deletes all previous pending tokens for that email
+ *   - Generates a new 24-hour token (raw stored in browser/email, SHA-256 hash in DB)
+ *   - Calls mail() and also displays the link inline (demo mode fallback)
+ */
 session_start();
 
 $message  = '';

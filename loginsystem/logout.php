@@ -1,4 +1,15 @@
 <?php
+/**
+ * Logout handler.
+ *
+ * Order matters here:
+ *   1. Capture session data before destruction
+ *   2. Generate AI farewell via Claude API (falls back to static message if API is unavailable)
+ *   3. Invalidate remember-me token — delete the DB row by token_hash, then expire the cookie.
+ *      Must happen BEFORE session_destroy() so we still have access to the cookie.
+ *   4. Destroy the PHP session
+ *   5. Render farewell page with 5-second JS redirect back to login
+ */
 session_start();
 require_once 'api_config.php';
 

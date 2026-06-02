@@ -1,4 +1,19 @@
 <?php
+/**
+ * Email verification landing page.
+ *
+ * Accepts a ?token= query parameter (raw hex token from the verification email).
+ * Hashes the token with SHA-256 and looks up the matching row in tbl_email_verifications
+ * where used=0 and expires_at is still in the future.
+ *
+ * On success:
+ *   - Marks the token as used (prevents replay)
+ *   - Sets email_verified=1 on tbl_signup
+ *   - Writes an 'email_verified' audit event
+ *
+ * On failure (invalid/expired/already-used token):
+ *   - Shows an inline resend form so the user can request a new token without navigating away
+ */
 session_start();
 
 $message = '';

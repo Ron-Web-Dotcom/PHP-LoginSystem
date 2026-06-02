@@ -1,4 +1,23 @@
 <?php
+/**
+ * GDPR personal data export.
+ *
+ * Requires an authenticated session (via auth_check.php).
+ * Collects all data stored for the current user across every table, then streams
+ * it as a JSON file download (Content-Disposition: attachment).
+ *
+ * Exported sections:
+ *   - account        : profile fields (password is explicitly excluded)
+ *   - login_history  : successful logins with timestamps and IPs
+ *   - failed_attempts: failed login records
+ *   - audit_log      : all security events
+ *   - notifications  : in-app notification history
+ *   - active_sessions: non-expired remember-me tokens (dates only, no hashes)
+ *   - backup_codes_count: total / used / remaining 2FA backup codes
+ *
+ * Each table is guarded with SHOW TABLES so the export degrades gracefully
+ * if the schema has not been fully bootstrapped yet.
+ */
 require_once 'auth_check.php';
 
 $email = $_SESSION['email'];

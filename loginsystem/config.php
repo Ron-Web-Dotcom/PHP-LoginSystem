@@ -1,4 +1,17 @@
 <?php
+/**
+ * Registration handler (POST from signup form).
+ *
+ * Steps:
+ *   1. DB connection guard — fails fast if MySQL is unavailable
+ *   2. Rate limiting — max 5 registrations per IP per hour (uses tbl_audit_log)
+ *   3. Duplicate email check
+ *   4. bcrypt password hashing + INSERT into tbl_signup with email_verified=0
+ *   5. Seeds tbl_password_history so change-password reuse checks work immediately
+ *   6. Writes a 'registration' audit event (used by rate limiter)
+ *   7. Generates a 24-hour email verification token and calls mail()
+ *      — in dev/demo mode the raw link is printed inline since mail() likely won't work
+ */
 session_start();
 
 $host     = "localhost";
